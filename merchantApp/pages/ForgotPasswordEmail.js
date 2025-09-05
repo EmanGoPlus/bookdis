@@ -7,12 +7,13 @@ import {
   View,
   TextInput,
   TouchableOpacity,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 import Svg, { Path } from "react-native-svg";
 
-export default function DefaultPage() {
+export default function DefaultPage({ navigation }) {
   const [fontsLoaded] = useFonts({
     "HessGothic-Bold": require("../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
   });
@@ -32,7 +33,10 @@ export default function DefaultPage() {
         backgroundColor="transparent"
       />
       <SafeAreaView style={styles.container}>
-        <View style={styles.linkRow}>
+        <TouchableOpacity
+          style={styles.linkRow}
+          onPress={() => navigation.navigate("Login")}
+        >
           <Svg
             width={50}
             height={50}
@@ -47,7 +51,7 @@ export default function DefaultPage() {
               fill="#FFFFFF"
             />
           </Svg>
-        </View>
+        </TouchableOpacity>
 
         <Text style={styles.headerText}>Find your Account</Text>
 
@@ -64,7 +68,18 @@ export default function DefaultPage() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.switch}>Search by phone number instead</Text>
+        <TouchableOpacity
+          onPress={() => {
+            navigation.navigate("ForgotPasswordNumber");
+          }}
+        >
+          <Text style={styles.switch}>Search by phone number instead</Text>
+        </TouchableOpacity>
+
+        <Image
+          style={styles.image}
+          source={require("../assets/bookdis-logo.png")}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -121,18 +136,28 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-    buttonText: {
+  buttonText: {
     fontFamily: "HessGothic-Bold",
     fontSize: 16,
     color: "#000",
     fontWeight: "600",
   },
-  
+
   switch: {
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 8,
     textAlign: "center",
     color: "#fff",
+  },
+
+  image: {
+    width: 70,
+    height: 70,
+    resizeMode: "contain",
+    position: "absolute", // 👈 take it out of normal layout
+    bottom: 20, // distance from bottom
+    right: 20, // distance from right,
+    marginBottom: 30,
   },
 });

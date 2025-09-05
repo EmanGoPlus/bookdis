@@ -18,8 +18,10 @@ import { useFonts } from "expo-font";
 import axios from "axios";
 import ErrorModal from "../components/errorModal";
 import SuccessModal from "../components/successModal";
+import { API_BASE_URL } from "../apiConfig";
 
-export default function LandingPage({ navigation }) {
+
+export default function Login({ navigation }) {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -72,19 +74,16 @@ export default function LandingPage({ navigation }) {
     }
 
     const response = await axios.post(
-      "http://192.168.1.20:5000/api/users/merchant-login",
+      `${API_BASE_URL}/api/users/merchant-login`,
       { phone, password },
       { headers: { "Content-Type": "application/json" }, timeout: 10000 }
     );
 
     console.log("Login response:", response.data);
 
-    // Show success modal
     setSuccessMessage("Login successful!");
     setShowSuccessModal(true);
 
-    // Navigate after closing modal
-    // This will be handled in the SuccessModal onClose prop
   } catch (err) {
     console.error("Full error object:", err);
     console.error("Login error:", err.response?.data || err.message);
@@ -163,7 +162,7 @@ export default function LandingPage({ navigation }) {
             <View style={styles.linkRow}>
               <TouchableOpacity
                 onPress={() => {
-                  navigation.navigate("ForgotPassword");
+                  navigation.navigate("ForgotPasswordEmail");
                 }}
               >
                 <Text style={styles.link}>Forgot password</Text>
@@ -171,7 +170,7 @@ export default function LandingPage({ navigation }) {
 
               <TouchableOpacity
                 onPress={() => {
-                  navigation.navigate("");
+                  navigation.navigate("Register");
                 }}
               >
                 <Text style={styles.link}>Sign up</Text>
@@ -197,7 +196,7 @@ export default function LandingPage({ navigation }) {
         message={successMessage}
         onClose={() => {
           setShowSuccessModal(false);
-          navigation.navigate("Home"); // navigate after closing
+          navigation.navigate("Home");
         }}
       />
     </LinearGradient>

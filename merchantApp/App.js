@@ -4,9 +4,11 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import LandingPage from "./pages/LandingPage"; 
 import Login from "./pages/Login";
-import ForgotPassword from "./pages/ForgotPassword"
+import ForgotPasswordEmail from "./pages/ForgotPasswordEmail"
+import ForgotPasswordNumber from "./pages/ForgotPasswordNumber"
 import Register from "./pages/Register"
 import Home from "./pages/Home";
+import CreateBusiness from "./pages/CreateBusiness"
 import Default from "./pages/default"
 
 
@@ -19,11 +21,14 @@ export default function App() {
         <Stack.Screen name="Landing" component={LandingPage} />
         <Stack.Screen name="Login" component={Login} />
         
-        <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+        <Stack.Screen name="ForgotPasswordEmail" component={ForgotPasswordEmail} />
+        <Stack.Screen name="ForgotPasswordNumber" component={ForgotPasswordNumber} />
 
         <Stack.Screen name="Register" component={Register} />
 
         <Stack.Screen name="Home" component={Home} />
+
+        <Stack.Screen name="CreateBusiness" component={CreateBusiness} />
         
         <Stack.Screen name="Default" component={Default} />
 

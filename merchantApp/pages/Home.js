@@ -1,9 +1,16 @@
 import React from "react";
-import { SafeAreaView, Text, StyleSheet, StatusBar } from "react-native";
+import {
+  SafeAreaView,
+  Text,
+  StyleSheet,
+  StatusBar,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 
-export default function DefaultPage() {
+export default function Home({ navigation }) {
   const [fontsLoaded] = useFonts({
     "HessGothic-Bold": require("../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
   });
@@ -23,7 +30,22 @@ export default function DefaultPage() {
         backgroundColor="transparent"
       />
       <SafeAreaView style={styles.container}>
-        <Text style={styles.text}>This is the Default Page</Text>
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerText}>Welcome to</Text>
+          <Text style={styles.headerText}>Bookdis</Text>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.button}onPress={() => {
+                  navigation.navigate("CreateBusiness");
+                }}>
+            <Text style={styles.buttonText}>Add Business</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.button}>
+            <Text style={styles.buttonText}>Select Business</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -35,13 +57,40 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    justifyContent: "center", // center vertically
-    alignItems: "center",     // center horizontally
     paddingHorizontal: 20,
   },
-  text: {
-    fontSize: 22,
+  headerContainer: {
+    alignItems: "center",
+    marginTop: 100,
+  },
+  buttonContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 150,
+  },
+  headerText: {
+    fontSize: 52,
     color: "#fff",
     fontFamily: "HessGothic-Bold",
+  },
+  button: {
+    backgroundColor: "#FFD882",
+    paddingVertical: 15,
+    borderRadius: 8,
+    marginTop: 30,
+    width: "100%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  buttonText: {
+    fontFamily: "HessGothic-Bold",
+    fontSize: 16,
+    color: "#000",
+    fontWeight: "600",
   },
 });

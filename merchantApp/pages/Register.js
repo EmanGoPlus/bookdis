@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import ErrorModal from "../components/errorModal";
 import SuccessModal from "../components/successModal";
+import { API_BASE_URL } from "../apiConfig";
 
 export default function Register({ navigation }) {
   const [checked, setChecked] = useState(false);
@@ -52,9 +53,39 @@ export default function Register({ navigation }) {
     }));
   };
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Invalid email format");
+      setShowErrorModal(true); // open modal immediately
+      return false;
+    }
+    return true;
+  };
+
+  const validatePassword = (password) => {
+    const minLength = 8;
+    const hasLetter = /[A-Za-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+
+    if (password.length < minLength) {
+      return "Password must be at least 8 characters long.";
+    }
+
+    if (!hasLetter) {
+      return "Password must contain at least one letter.";
+    }
+
+    if (!hasNumber) {
+      return "Password must contain at least one number.";
+    }
+
+    return null;
+  };
+
   const handleSignup = async () => {
     try {
-      const { firstName, lastName, email, phone, password, role } = formData;
+      const { firstName, lastName, email, phone, password, confirmPassword, role } = formData;
 
       if (!firstName || !lastName || !email || !phone || !password) {
         setError("Please fill in all required fields");
@@ -62,10 +93,25 @@ export default function Register({ navigation }) {
         return;
       }
 
+      if (!validateEmail(email)) return; // stops signup if email is invalid
+
       console.log("Sending data:", { firstName, lastName, email, phone, role });
 
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        setError(passwordError);
+        setShowErrorModal(true);
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        setShowErrorModal(true);
+        return;
+      }
+
       const response = await axios.post(
-        "http://192.168.1.20:5000/api/users/merchant-register",
+        `${API_BASE_URL}/api/users/merchant-register`,
         { firstName, lastName, password, email, phone, role },
         {
           headers: { "Content-Type": "application/json" },
@@ -93,7 +139,7 @@ export default function Register({ navigation }) {
       }
 
       setError(errorMessage);
-      setShowErrorModal(true);
+      setShowErrorModal(true); // <-- THIS triggers your ErrorModal
     }
   };
 
@@ -337,12 +383,6 @@ export default function Register({ navigation }) {
             </ScrollView>
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.declineButton}
-                onPress={handleDeclineTerms}
-              >
-                <Text style={styles.declineButtonText}>Decline</Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.acceptButton}
                 onPress={handleAcceptTerms}
