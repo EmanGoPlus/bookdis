@@ -8,19 +8,22 @@ import {
   Image,
   TouchableOpacity,
   TextInput,
+  ScrollView, // ✅ add ScrollView
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 import * as ImagePicker from "expo-image-picker";
 import DropDownPicker from "react-native-dropdown-picker";
+import axios from "axios";
 
-export default function DefaultPage() {
+import { BUSINESS_CATEGORIES } from "../datas/business-category-datas";
+
+export default function CreateBusiness() {
   const [image, setImage] = useState(null);
   const [fontsLoaded] = useFonts({
     "HessGothic-Bold": require("../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
   });
 
-  // Logo picker
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -28,146 +31,110 @@ export default function DefaultPage() {
       aspect: [1, 1],
       quality: 1,
     });
-
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-    }
+    if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-  // Combined dropdown state
+  // ==== Category states (unchanged) ====
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
   const [items, setItems] = useState([]);
-  const [currentLevel, setCurrentLevel] = useState('main'); // 'main' or 'sub'
+  const [currentLevel, setCurrentLevel] = useState("main");
   const [selectedMainCategory, setSelectedMainCategory] = useState(null);
-  const [customCategory, setCustomCategory] = useState(''); // For "Other" input
+  const [customCategory, setCustomCategory] = useState("");
 
-  const mainItems = [
-    { label: "Retail & Consumer Goods", value: "retail" },
-    { label: "Food & Beverage", value: "food" },
-    { label: "Services", value: "services" },
-    { label: "Health & Fitness", value: "health" },
-    { label: "Technology & IT", value: "tech" },
-    { label: "Professional Services", value: "pro" },
-    { label: "Transportation & Logistics", value: "transport" },
-    { label: "Real Estate & Property", value: "realestate" },
-    { label: "Arts & Entertainment", value: "arts" },
-    { label: "Other", value: "other" },
-  ];
-
-  const subCategories = {
-    retail: [
-      { label: "← Back to Categories", value: "back" },
-      { label: "Clothing & Apparel", value: "clothing" },
-      { label: "Electronics", value: "electronics" },
-      { label: "Grocery / Supermarket", value: "grocery" },
-      { label: "Furniture & Home Decor", value: "furniture" },
-      { label: "Beauty & Cosmetics", value: "beauty" },
-      { label: "Jewelry & Accessories", value: "jewelry" },
-      { label: "Books & Stationery", value: "books" },
-      { label: "Other", value: "other" },
-    ],
-    food: [
-      { label: "← Back to Categories", value: "back" },
-      { label: "Restaurant", value: "restaurant" },
-      { label: "Cafe / Coffee Shop", value: "cafe" },
-      { label: "Bakery / Pastry Shop", value: "bakery" },
-      { label: "Bar / Pub", value: "bar" },
-      { label: "Fast Food", value: "fastfood" },
-      { label: "Catering Services", value: "catering" },
-      { label: "Other", value: "other" },
-    ],
-    services: [
-      { label: "← Back to Categories", value: "back" },
-      { label: "Hair & Beauty Salon", value: "salon" },
-      { label: "Spa / Wellness", value: "spa" },
-      { label: "Cleaning Services", value: "cleaning" },
-      { label: "Photography / Videography", value: "photography" },
-      { label: "Event Planning", value: "events" },
-      { label: "Repair Services", value: "repair" },
-      { label: "Tutoring / Education", value: "tutoring" },
-      { label: "Other", value: "other" },
-    ],
-    health: [
-      { label: "← Back to Categories", value: "back" },
-      { label: "Gym / Fitness Center", value: "gym" },
-      { label: "Yoga / Pilates Studio", value: "yoga" },
-      { label: "Clinic / Healthcare Provider", value: "clinic" },
-      { label: "Pharmacy", value: "pharmacy" },
-      { label: "Other", value: "other" },
-    ],
-    tech: [
-      { label: "← Back to Categories", value: "back" },
-      { label: "Software Development", value: "software" },
-      { label: "Web Design / Development", value: "web" },
-      { label: "IT Support / Services", value: "itsupport" },
-      { label: "E-commerce", value: "ecommerce" },
-      { label: "Other", value: "other" },
-    ],
-    pro: [
-      { label: "← Back to Categories", value: "back" },
-      { label: "Accounting / Bookkeeping", value: "accounting" },
-      { label: "Legal Services", value: "legal" },
-      { label: "Consulting", value: "consulting" },
-      { label: "Marketing / Advertising", value: "marketing" },
-      { label: "Other", value: "other" },
-    ],
-    transport: [
-      { label: "← Back to Categories", value: "back" },
-      { label: "Taxi / Ride-hailing", value: "taxi" },
-      { label: "Courier / Delivery Services", value: "courier" },
-      { label: "Moving / Relocation Services", value: "moving" },
-      { label: "Vehicle Rentals", value: "rentals" },
-      { label: "Other", value: "other" },
-    ],
-    realestate: [
-      { label: "← Back to Categories", value: "back" },
-      { label: "Real Estate Agency", value: "agency" },
-      { label: "Property Management", value: "property" },
-      { label: "Construction & Contracting", value: "construction" },
-      { label: "Other", value: "other" },
-    ],
-    arts: [
-      { label: "← Back to Categories", value: "back" },
-      { label: "Music / Dance Studio", value: "music" },
-      { label: "Art Gallery", value: "art" },
-      { label: "Theater / Cinema", value: "theater" },
-      { label: "Gaming / eSports", value: "gaming" },
-      { label: "Other", value: "other" },
-    ],
-  };
-
-  // Initialize with main categories
   useEffect(() => {
-    setItems(mainItems);
+    setItems(BUSINESS_CATEGORIES.main);
   }, []);
 
-  // Handle selection
   const handleSelection = (selectedValue) => {
     if (selectedValue === "back") {
-      // Go back to main categories
-      setCurrentLevel('main');
-      setItems(mainItems);
+      setCurrentLevel("main");
+      setItems(BUSINESS_CATEGORIES.main);
       setValue(null);
       setSelectedMainCategory(null);
-      setCustomCategory(''); // Clear custom input
+      setCustomCategory("");
     } else if (selectedValue === "other") {
-      // Selected "Other", keep the selection but don't navigate
       setValue(selectedValue);
-      setCustomCategory(''); // Reset custom input when "Other" is selected
-    } else if (currentLevel === 'main' && subCategories[selectedValue]) {
-      // Selected a main category, show subcategories
-      setCurrentLevel('sub');
+      setCustomCategory("");
+    } else if (
+      currentLevel === "main" &&
+      BUSINESS_CATEGORIES.sub[selectedValue]
+    ) {
+      setCurrentLevel("sub");
       setSelectedMainCategory(selectedValue);
-      setItems(subCategories[selectedValue]);
+      setItems(BUSINESS_CATEGORIES.sub[selectedValue]);
       setValue(null);
-      setCustomCategory(''); // Clear custom input
+      setCustomCategory("");
     } else {
-
       setValue(selectedValue);
-      setCustomCategory('');
+      setCustomCategory("");
     }
   };
+
+  // ==== Address states ====
+  const [regions, setRegions] = useState([]);
+  const [provinces, setProvinces] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [barangays, setBarangays] = useState([]);
+
+  const [selectedRegion, setSelectedRegion] = useState(null);
+  const [selectedProvince, setSelectedProvince] = useState(null);
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [selectedBarangay, setSelectedBarangay] = useState(null);
+
+  const [openRegion, setOpenRegion] = useState(false);
+  const [openProvince, setOpenProvince] = useState(false);
+  const [openCity, setOpenCity] = useState(false);
+  const [openBarangay, setOpenBarangay] = useState(false);
+
+  useEffect(() => {
+    axios.get("https://psgc.cloud/api/regions").then((res) => {
+      setRegions(res.data.map((r) => ({ label: r.name, value: r.code })));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (selectedRegion) {
+      axios
+        .get(`https://psgc.cloud/api/regions/${selectedRegion}/provinces`)
+        .then((res) => {
+          setProvinces(res.data.map((p) => ({ label: p.name, value: p.code })));
+          setCities([]);
+          setBarangays([]);
+          setSelectedProvince(null);
+          setSelectedCity(null);
+          setSelectedBarangay(null);
+        });
+    }
+  }, [selectedRegion]);
+
+  useEffect(() => {
+    if (selectedProvince) {
+      axios
+        .get(
+          `https://psgc.cloud/api/provinces/${selectedProvince}/cities-municipalities`
+        )
+        .then((res) => {
+          setCities(res.data.map((c) => ({ label: c.name, value: c.code })));
+          setBarangays([]);
+          setSelectedCity(null);
+          setSelectedBarangay(null);
+        });
+    }
+  }, [selectedProvince]);
+
+  useEffect(() => {
+    if (selectedCity) {
+      axios
+        .get(
+          `https://psgc.cloud/api/cities-municipalities/${selectedCity}/barangays`
+        )
+        .then((res) => {
+          setBarangays(res.data.map((b) => ({ label: b.name, value: b.code })));
+          setSelectedBarangay(null);
+        });
+    }
+  }, [selectedCity]);
 
   if (!fontsLoaded) return null;
 
@@ -184,84 +151,172 @@ export default function DefaultPage() {
         backgroundColor="transparent"
       />
       <SafeAreaView style={styles.container}>
-        <Text style={styles.text}>Business Information</Text>
+        <ScrollView contentContainerStyle={{ paddingBottom: 50 }}>
+          <Text style={styles.text}>Business Information</Text>
 
-        <View style={styles.imageContainer}>
-          <Image
-            source={
-              image ? { uri: image } : require("../assets/default-image.png")
-            }
-            style={styles.logoImage}
-          />
-          <TouchableOpacity onPress={pickImage} style={styles.uploadButton}>
-            <Text style={styles.uploadButtonText}>Upload a Logo</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.label}>
-          {currentLevel === 'main' ? 'Category' : 'Sub-Category'}
-        </Text>
-        <DropDownPicker
-          open={open}
-          value={value}
-          items={items}
-          setOpen={setOpen}
-          setValue={setValue}
-          onSelectItem={(item) => handleSelection(item.value)}
-          placeholder={
-            currentLevel === 'main' 
-              ? "Select main category" 
-              : "Select sub-category"
-          }
-          zIndex={3000}
-          zIndexInverse={1000}
-        />
-
-        {/* Show text input when "Other" is selected */}
-        {value === "other" && (
-          <View style={styles.otherInputContainer}>
-            <Text style={styles.label}>
-              Please specify your {currentLevel === 'main' ? 'category' : 'sub-category'}:
-            </Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder={`Enter your ${currentLevel === 'main' ? 'category' : 'sub-category'}`}
-              placeholderTextColor="#999"
-              value={customCategory}
-              onChangeText={setCustomCategory}
+          {/* Logo */}
+          <View style={styles.imageContainer}>
+            <Image
+              source={
+                image ? { uri: image } : require("../assets/default-image.png")
+              }
+              style={styles.logoImage}
             />
+            <TouchableOpacity onPress={pickImage} style={styles.uploadButton}>
+              <Text style={styles.uploadButtonText}>Upload a Logo</Text>
+            </TouchableOpacity>
           </View>
-        )}
 
-        {/* Display selected values for debugging */}
-        {selectedMainCategory && (
-          <Text style={styles.debugText}>
-            Main Category: {mainItems.find(item => item.value === selectedMainCategory)?.label}
+          {/* Business Name */}
+          <Text style={styles.label}>Business Name</Text>
+          <TextInput style={styles.input} autoCapitalize="words"
+          placeholder="Enter business name" />
+
+          {/* Category */}
+          <Text style={styles.label}>
+            {currentLevel === "main" ? "Category" : "Sub-Category"}
           </Text>
-        )}
-        {value && value !== 'back' && currentLevel === 'sub' && value !== 'other' && (
-          <Text style={styles.debugText}>
-            Sub Category: {items.find(item => item.value === value)?.label}
-          </Text>
-        )}
-        {value === 'other' && customCategory && (
-          <Text style={styles.debugText}>
-            Custom {currentLevel === 'main' ? 'Category' : 'Sub-Category'}: {customCategory}
-          </Text>
-        )}
+
+          <DropDownPicker
+            open={open}
+            value={value}
+            items={items}
+            setOpen={setOpen}
+            setValue={setValue}
+            setItems={setItems} // 👈 make sure to add this back
+            onSelectItem={(item) => handleSelection(item.value)}
+            placeholder={
+              currentLevel === "main"
+                ? "Select main category"
+                : "Select sub-category"
+            }
+            listMode="SCROLLVIEW"
+            style={styles.dropdown}
+            zIndex={5000}
+            zIndexInverse={1000}
+          />
+
+          {/* Show text input when "Other" is selected */}
+          {value === "other" && (
+            <View style={styles.otherInputContainer}>
+              <Text style={styles.label}>
+                Please specify your{" "}
+                {currentLevel === "main" ? "category" : "sub-category"}:
+              </Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder={`Enter your ${
+                  currentLevel === "main" ? "category" : "sub-category"
+                }`}
+                placeholderTextColor="#999"
+                value={customCategory}
+                onChangeText={setCustomCategory}
+              />
+            </View>
+          )}
+
+          {/* Display selected values for debugging */}
+          {selectedMainCategory && (
+            <Text style={styles.debugText}>
+              Main Category:{" "}
+              {
+                BUSINESS_CATEGORIES.main.find(
+                  (item) => item.value === selectedMainCategory
+                )?.label
+              }
+            </Text>
+          )}
+
+          {value &&
+            value !== "back" &&
+            currentLevel === "sub" &&
+            value !== "other" && (
+              <Text style={styles.debugText}>
+                Sub Category:{" "}
+                {items.find((item) => item.value === value)?.label}
+              </Text>
+            )}
+
+          {value === "other" && customCategory && (
+            <Text style={styles.debugText}>
+              Custom {currentLevel === "main" ? "Category" : "Sub-Category"}:{" "}
+              {customCategory}
+            </Text>
+          )}
+
+          {/* Address dropdowns */}
+          <Text style={styles.label}>Region</Text>
+          <DropDownPicker
+            open={openRegion}
+            value={selectedRegion}
+            items={regions}
+            setOpen={setOpenRegion}
+            setValue={setSelectedRegion}
+            placeholder="Select Region"
+            listMode="SCROLLVIEW"
+            style={styles.dropdown}
+            zIndex={4000}
+          />
+
+          <Text style={styles.label}>Province</Text>
+          <DropDownPicker
+            open={openProvince}
+            value={selectedProvince}
+            items={provinces}
+            setOpen={setOpenProvince}
+            setValue={setSelectedProvince}
+            placeholder="Select Province"
+            listMode="SCROLLVIEW"
+            style={styles.dropdown}
+            zIndex={3000}
+          />
+
+          <Text style={styles.label}>City / Municipality</Text>
+          <DropDownPicker
+            open={openCity}
+            value={selectedCity}
+            items={cities}
+            setOpen={setOpenCity}
+            setValue={setSelectedCity}
+            placeholder="Select City"
+            listMode="SCROLLVIEW"
+            style={styles.dropdown}
+            zIndex={2000}
+          />
+
+          <Text style={styles.label}>Barangay</Text>
+          <DropDownPicker
+            open={openBarangay}
+            value={selectedBarangay}
+            items={barangays}
+            setOpen={setOpenBarangay}
+            setValue={setSelectedBarangay}
+            placeholder="Select Barangay"
+            listMode="SCROLLVIEW"
+            style={styles.dropdown}
+            zIndex={1000}
+          />
+
+          <Text style={styles.label}>Postal Code</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric" // 👈 makes keyboard show numbers only
+            maxLength={4} // 👈 optional, limit postal code length (PH is 4 digits)
+            placeholder="Enter postal code"
+          />
+
+          <Text style={styles.label}>Address Details</Text>
+          <TextInput style={styles.input} autoCapitalize="words"
+          placeholder="Enter exact address" />
+        </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
+  background: { flex: 1 },
+  container: { flex: 1, paddingHorizontal: 20 },
   text: {
     marginTop: 45,
     fontSize: 35,
@@ -269,10 +324,7 @@ const styles = StyleSheet.create({
     fontFamily: "HessGothic-Bold",
     textAlign: "center",
   },
-  imageContainer: {
-    alignItems: "center",
-    marginTop: 20,
-  },
+  imageContainer: { alignItems: "center", marginTop: 20 },
   logoImage: {
     width: 200,
     height: 200,
@@ -293,31 +345,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "HessGothic-Bold",
   },
-  label: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 5,
-    marginTop: 15,
-    alignSelf: "flex-start",
-  },
-  debugText: {
-    color: "#fff",
-    fontSize: 12,
-    marginTop: 10,
-  },
-  otherInputContainer: {
-    marginTop: 15,
-  },
-  textInput: {
+  label: { color: "#fff", fontSize: 14, fontWeight: "600", marginTop: 15 },
+  input: {
+    height: 40,
+    borderWidth: 1,
+    borderColor: "transparent",
+    paddingHorizontal: 12,
     backgroundColor: "#fff",
     borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
     fontSize: 16,
-    color: "#000",
-    borderWidth: 1,
-    borderColor: "#ddd",
   },
-  form: { marginTop: 20, zIndex: 3000 },
+  dropdown: { marginBottom: 10 },
 });

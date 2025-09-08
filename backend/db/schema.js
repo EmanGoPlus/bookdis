@@ -20,3 +20,4 @@ export const businesses = pgTable("tbl_businesses", {
   operatingHours: varchar("operating_hours").notNull(),
   verificationStatus: boolean("is_verified").default(false).notNull(),
 });
+
