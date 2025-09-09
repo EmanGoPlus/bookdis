@@ -7,6 +7,7 @@ import { businessDocuments } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 
 const userModel = {
+  
   async getUserByPhone(phone) {
     const result = await db
       .select()

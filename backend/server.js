@@ -1,5 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static"; // <-- import
+import path from "path";
 import userRoutes from "./routes/merchantRoutes.js";
 import { pool } from "./db/config.js";
 
@@ -14,33 +16,20 @@ const fastify = Fastify({
 
 // Enable CORS
 await fastify.register(cors, {
-  origin: "http://localhost:5173",
+  origin: "*", // allow all for testing; later restrict to your frontend
   methods: ["GET", "POST", "PUT", "DELETE"],
 });
 
-// fastify.register(fastifyMultipart, {
-//   limits: {
-//     fileSize: 5 * 1024 * 1024, // 5MB limit per file
-//   },
-// });
-
-// JSON parser (optional if you want custom behavior)
-fastify.addContentTypeParser(
-  "application/json",
-  { parseAs: "string" },
-  function (req, body, done) {
-    try {
-      const json = JSON.parse(body);
-      done(null, json);
-    } catch (err) {
-      done(err, undefined);
-    }
-  }
-);
+// Serve uploads folder
+await fastify.register(fastifyStatic, {
+  root: path.join(process.cwd(), "uploads"), // folder where logos exist
+  prefix: "/uploads/", // must match the DB paths
+});
 
 // Register routes
 fastify.register(userRoutes, { prefix: "/api/merchant" });
 
+// PostgreSQL + start server
 const start = async () => {
   try {
     await pool.connect();

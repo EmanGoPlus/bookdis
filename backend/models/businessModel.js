@@ -6,12 +6,12 @@ import { eq, and } from "drizzle-orm";
 const businessModel = {
 
   //: Fetch a single business by its unique
-  async getBusinessById(id) {
+  async getBusinessById(businessId) {
     try {
       const result = await db
         .select()
         .from(businesses)
-        .where(eq(businesses.id, id)) // ✅ Fixed: Use eq() function consistently
+        .where(eq(businesses.id, businessId))
         .limit(1);
 
       return result[0] || null;

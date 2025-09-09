@@ -82,20 +82,53 @@ export default function Home({ navigation }) {
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={selectedBusinessId}
-                onValueChange={(itemValue) => {
-                  console.log("🏢 Selected business ID:", itemValue);
+                onValueChange={async (itemValue) => {
                   setSelectedBusinessId(itemValue);
+
+                  if (itemValue) {
+                    try {
+                      const token = await AsyncStorage.getItem("token");
+                      const response = await axios.get(
+                        `${API_BASE_URL}/api/merchant/business/${itemValue}`,
+                        {
+                          headers: { Authorization: `Bearer ${token}` },
+                        }
+                      );
+
+                      console.log("🏢 Full API Response:", response.data);
+                      
+                      const business = response.data.data;
+                      
+                      console.log("🏢 Business object:", business);
+                      console.log("🏢 Business name:", business.businessName);
+                      console.log("🏢 Business logo:", business.logo);
+                      console.log("🏢 Business logo_url:", business.logo_url);
+                      
+                      // Navigate to Profile with business info
+                      navigation.navigate("Profile", {
+                        businessName: business.businessName,
+                        logo: business.logo, // This should contain the logo path
+                      });
+                      
+                      console.log("🏢 Navigating with:", {
+                        businessName: business.businessName,
+                        logo: business.logo,
+                      });
+                      
+                    } catch (err) {
+                      console.error("❌ Error fetching business details:", err.message);
+                      if (err.response) {
+                        console.error("❌ Error response:", err.response.data);
+                      }
+                    }
+                  }
                 }}
                 style={styles.picker}
                 dropdownIconColor="#666"
               >
                 <Picker.Item label="-- Choose Business --" value="" />
                 {businesses.map((biz) => (
-                  <Picker.Item
-                    key={biz.id}
-                    label={biz.businessName}
-                    value={biz.id}
-                  />
+                  <Picker.Item key={biz.id} label={biz.businessName} value={biz.id} />
                 ))}
               </Picker>
             </View>
@@ -105,7 +138,14 @@ export default function Home({ navigation }) {
             style={styles.button} 
             onPress={() => navigation.navigate("Verification")}
           >
-            <Text style={styles.buttonText}>Verification (Temporary)</Text>
+            <Text style={styles.buttonText}>Verification (Temporary Button)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={() => navigation.navigate("Profile")}
+          >
+            <Text style={styles.buttonText}>Profile (Temporary Button)</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

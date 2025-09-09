@@ -4,7 +4,6 @@ import authenticateToken from "../middlewares/auth.js";
 import fastifyMultipart from "@fastify/multipart";
 
 async function userRoutes(fastify, options) {
-
   fastify.register(fastifyMultipart, {
     // ✅ Removed attachFieldsToBody to allow manual processing
     limits: {
@@ -38,6 +37,12 @@ async function userRoutes(fastify, options) {
     preHandler: authenticateToken,
     handler: businessController.getDocuments,
   });
+
+  fastify.get(
+    "/business/:businessId",
+    { preHandler: authenticateToken },
+    businessController.getBusinessById
+  );
 
   // Admin: verify a document
   // fastify.put("/verify-document/:documentId", {

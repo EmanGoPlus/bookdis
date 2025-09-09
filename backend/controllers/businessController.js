@@ -109,8 +109,7 @@ async uploadDocuments(request, reply) {
       console.log("❌ Business ID is missing");
       return reply.status(400).send({ error: "Business ID is required" });
     }
-
-    // ✅ Fixed: Use the correct method name
+    
     const business = await businessModel.getBusinessById(businessId);
     if (!business) {
       return reply.status(404).send({ error: "Business not found" });
@@ -166,6 +165,42 @@ async uploadDocuments(request, reply) {
       return res.status(500).json({ error: "Internal server error" });
     }
   },
+
+async getBusinessById(request, reply) {
+  try {
+    const { businessId } = request.params;
+
+    if (!businessId) {
+      return reply.status(400).send({ error: "Business ID is required" });
+    }
+
+    const business = await businessModel.getBusinessById(Number(businessId));
+
+    if (!business) {
+      return reply.status(404).send({ error: "Business not found" });
+    }
+
+    // Debug: Log the raw business data
+    console.log("🏢 Raw business data:", business);
+    console.log("🏢 Available keys:", Object.keys(business));
+    console.log("🏢 Logo field:", business.logo); // This should contain the logo path
+
+    // The business.logo already contains the logo_url value from the database
+    // No need to map logo_url to logo since Drizzle already does this
+    const responseBusiness = {
+      ...business,
+      // logo is already available from the schema mapping
+    };
+
+    console.log("🏢 Response business data:", responseBusiness);
+
+    return reply.status(200).send({ data: responseBusiness });
+  } catch (err) {
+    console.error("❌ Error fetching business:", err);
+    return reply.status(500).send({ error: "Internal server error" });
+  }
+}
+
   
 }
 
