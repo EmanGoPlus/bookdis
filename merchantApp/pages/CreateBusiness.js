@@ -50,20 +50,26 @@ export default function CreateBusiness({ navigation }) {
       return;
     }
 
-    if (!selectedMainCategory && !customCategory) {
+    if (!selectedMainCategory && !customMainCategory) {
       setError("Please select a main category.");
       setShowErrorModal(true);
       return;
     }
 
-    if (currentLevel === "sub" && !value && value !== "other") {
+    if (selectedMainCategory && selectedMainCategory !== "other" && !selectedSubCategory && !customSubCategory) {
       setError("Please select a sub-category.");
       setShowErrorModal(true);
       return;
     }
 
-    if (value === "other" && !customCategory.trim()) {
-      setError("Please enter your custom category.");
+    if (selectedMainCategory === "other" && !customMainCategory.trim()) {
+      setError("Please enter your custom main category.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (selectedSubCategory === "other" && !customSubCategory.trim()) {
+      setError("Please enter your custom sub-category.");
       setShowErrorModal(true);
       return;
     }
@@ -124,11 +130,15 @@ export default function CreateBusiness({ navigation }) {
       }
 
       formData.append("businessName", businessName);
-      formData.append("mainCategory", selectedMainCategory || "");
-      formData.append(
-        "subCategory",
-        value === "other" ? customCategory : value || ""
-      );
+      
+      // Handle main category
+      const finalMainCategory = selectedMainCategory === "other" ? customMainCategory : selectedMainCategory;
+      formData.append("mainCategory", finalMainCategory || "");
+      
+      // Handle sub category
+      const finalSubCategory = selectedSubCategory === "other" ? customSubCategory : selectedSubCategory;
+      formData.append("subCategory", finalSubCategory || "");
+      
       formData.append(
         "region",
         regions.find((r) => r.value === selectedRegion)?.label || ""
@@ -188,8 +198,9 @@ export default function CreateBusiness({ navigation }) {
     setSelectedCity(null);
     setSelectedBarangay(null);
     setSelectedMainCategory(null);
-    setValue(null);
-    setCustomCategory("");
+    setSelectedSubCategory(null);
+    setCustomMainCategory("");
+    setCustomSubCategory("");
     setOpenTime(new Date(2024, 0, 1, 9, 0));
     setCloseTime(new Date(2024, 0, 1, 18, 0));
   };
@@ -204,45 +215,40 @@ export default function CreateBusiness({ navigation }) {
     if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-  // ==== Category states (unchanged) ====
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(null);
-  const [items, setItems] = useState([]);
-  const [currentLevel, setCurrentLevel] = useState("main");
+  // ==== SEPARATED Category states ====
+  // Main Category
+  const [openMainCategory, setOpenMainCategory] = useState(false);
   const [selectedMainCategory, setSelectedMainCategory] = useState(null);
-  const [customCategory, setCustomCategory] = useState("");
+  const [mainCategoryItems, setMainCategoryItems] = useState([]);
+  const [customMainCategory, setCustomMainCategory] = useState("");
 
+  // Sub Category  
+  const [openSubCategory, setOpenSubCategory] = useState(false);
+  const [selectedSubCategory, setSelectedSubCategory] = useState(null);
+  const [subCategoryItems, setSubCategoryItems] = useState([]);
+  const [customSubCategory, setCustomSubCategory] = useState("");
+
+  // Time states
   const [openTime, setOpenTime] = useState(new Date(2024, 0, 1, 9, 0)); // 9:00 AM
   const [closeTime, setCloseTime] = useState(new Date(2024, 0, 1, 18, 0)); // 6:00 PM
   const [showOpenPicker, setShowOpenPicker] = useState(false);
   const [showClosePicker, setShowClosePicker] = useState(false);
 
+  // Initialize main categories
   useEffect(() => {
-    setItems(BUSINESS_CATEGORIES.main);
+    setMainCategoryItems(BUSINESS_CATEGORIES.main);
   }, []);
 
-  const handleSelection = (selectedValue) => {
-    if (selectedValue === "back") {
-      setCurrentLevel("main");
-      setItems(BUSINESS_CATEGORIES.main);
-      setValue(null);
-      setSelectedMainCategory(null);
-      setCustomCategory("");
-    } else if (selectedValue === "other") {
-      setValue(selectedValue);
-      setCustomCategory("");
-    } else if (
-      currentLevel === "main" &&
-      BUSINESS_CATEGORIES.sub[selectedValue]
-    ) {
-      setCurrentLevel("sub");
-      setSelectedMainCategory(selectedValue);
-      setItems(BUSINESS_CATEGORIES.sub[selectedValue]);
-      setValue(null);
-      setCustomCategory("");
+  // Handle main category selection and load sub categories
+  const handleMainCategoryChange = (value) => {
+    setSelectedMainCategory(value);
+    setSelectedSubCategory(null); // Reset sub category
+    setCustomSubCategory(""); // Reset custom sub category
+    
+    if (value && value !== "other" && BUSINESS_CATEGORIES.sub[value]) {
+      setSubCategoryItems(BUSINESS_CATEGORIES.sub[value]);
     } else {
-      setValue(selectedValue);
-      setCustomCategory("");
+      setSubCategoryItems([]);
     }
   };
 
@@ -360,75 +366,84 @@ export default function CreateBusiness({ navigation }) {
             onChangeText={setBusinessName}
           />
 
-          {/* Category */}
-          <Text style={styles.label}>
-            {currentLevel === "main" ? "Category" : "Sub-Category"}
-          </Text>
-
+          {/* SEPARATED Main Category */}
+          <Text style={styles.label}>Main Category</Text>
           <DropDownPicker
-            open={open}
-            value={value}
-            items={items}
-            setOpen={setOpen}
-            setValue={setValue}
-            setItems={setItems} // 👈 make sure to add this back
-            onSelectItem={(item) => handleSelection(item.value)}
-            placeholder={
-              currentLevel === "main"
-                ? "Select main category"
-                : "Select sub-category"
-            }
+            open={openMainCategory}
+            value={selectedMainCategory}
+            items={mainCategoryItems}
+            setOpen={setOpenMainCategory}
+            setValue={setSelectedMainCategory}
+            setItems={setMainCategoryItems}
+            onSelectItem={(item) => handleMainCategoryChange(item.value)}
+            placeholder="Select main category"
             listMode="SCROLLVIEW"
             style={styles.dropdown}
-            zIndex={5000}
+            zIndex={6000}
             zIndexInverse={1000}
           />
 
-          {/* Show text input when "Other" is selected */}
-          {value === "other" && (
+          {/* Custom Main Category Input */}
+          {selectedMainCategory === "other" && (
             <View style={styles.otherInputContainer}>
-              <Text style={styles.label}>
-                Please specify your{" "}
-                {currentLevel === "main" ? "category" : "sub-category"}:
-              </Text>
+              <Text style={styles.label}>Please specify your main category:</Text>
               <TextInput
                 style={styles.input}
-                placeholder={`Enter your ${
-                  currentLevel === "main" ? "category" : "sub-category"
-                }`}
+                placeholder="Enter your main category"
                 placeholderTextColor="#999"
-                value={customCategory}
-                onChangeText={setCustomCategory}
+                value={customMainCategory}
+                onChangeText={setCustomMainCategory}
               />
             </View>
           )}
 
+          {/* SEPARATED Sub Category - Only show if main category is selected and not "other" */}
+          {selectedMainCategory && selectedMainCategory !== "other" && subCategoryItems.length > 0 && (
+            <>
+              <Text style={styles.label}>Sub-Category</Text>
+              <DropDownPicker
+                open={openSubCategory}
+                value={selectedSubCategory}
+                items={subCategoryItems}
+                setOpen={setOpenSubCategory}
+                setValue={setSelectedSubCategory}
+                setItems={setSubCategoryItems}
+                placeholder="Select sub-category"
+                listMode="SCROLLVIEW"
+                style={styles.dropdown}
+                zIndex={5500}
+                zIndexInverse={1000}
+              />
+
+              {/* Custom Sub Category Input */}
+              {selectedSubCategory === "other" && (
+                <View style={styles.otherInputContainer}>
+                  <Text style={styles.label}>Please specify your sub-category:</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your sub-category"
+                    placeholderTextColor="#999"
+                    value={customSubCategory}
+                    onChangeText={setCustomSubCategory}
+                    zIndex={5000}
+                  />
+                </View>
+              )}
+            </>
+          )}
+
           {/* Display selected values for debugging */}
-          {selectedMainCategory && (
+          {(selectedMainCategory || customMainCategory) && (
             <Text style={styles.debugText}>
-              Main Category:{" "}
-              {
-                BUSINESS_CATEGORIES.main.find(
-                  (item) => item.value === selectedMainCategory
-                )?.label
-              }
+              Main Category: {selectedMainCategory === "other" ? customMainCategory : 
+                mainCategoryItems.find((item) => item.value === selectedMainCategory)?.label || selectedMainCategory}
             </Text>
           )}
 
-          {value &&
-            value !== "back" &&
-            currentLevel === "sub" &&
-            value !== "other" && (
-              <Text style={styles.debugText}>
-                Sub Category:{" "}
-                {items.find((item) => item.value === value)?.label}
-              </Text>
-            )}
-
-          {value === "other" && customCategory && (
+          {(selectedSubCategory || customSubCategory) && (
             <Text style={styles.debugText}>
-              Custom {currentLevel === "main" ? "Category" : "Sub-Category"}:{" "}
-              {customCategory}
+              Sub Category: {selectedSubCategory === "other" ? customSubCategory : 
+                subCategoryItems.find((item) => item.value === selectedSubCategory)?.label || selectedSubCategory}
             </Text>
           )}
 
@@ -504,7 +519,6 @@ export default function CreateBusiness({ navigation }) {
           />
 
           {/* Operating Hours */}
-
           <View>
             <Text style={styles.label}>Open Time</Text>
             <TouchableOpacity
@@ -551,7 +565,7 @@ export default function CreateBusiness({ navigation }) {
 
           <TouchableOpacity
             style={styles.button}
-            onPress={handleCreateBusiness} // 👈 call the function
+            onPress={handleCreateBusiness}
           >
             <Text style={styles.buttonText}>Save Changes</Text>
           </TouchableOpacity>
@@ -575,8 +589,8 @@ export default function CreateBusiness({ navigation }) {
         visible={showSuccessModal}
         message={successMessage}
         onClose={() => {
-          setShowSuccessModal(false); // hide modal
-          resetForm(); // reset all fields
+          setShowSuccessModal(false);
+          resetForm();
           navigation.navigate("Verification");
         }}
       />
@@ -645,10 +659,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 8,
     fontSize: 16,
-    justifyContent: "center", // 👈 add this
+    justifyContent: "center",
   },
 
   dropdown: {
     marginBottom: 10,
+  },
+
+  otherInputContainer: {
+    marginTop: 10,
+  },
+
+  debugText: {
+    color: "#fff",
+    fontSize: 12,
+    marginTop: 5,
+    fontStyle: "italic",
   },
 });
