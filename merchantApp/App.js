@@ -11,6 +11,7 @@ import Home from "./pages/Home";
 import CreateBusiness from "./pages/CreateBusiness";
 import Verification from "./pages/Verification";
 import Profile from "./pages/Account/Profile";
+import Dashboard from "./pages/Dashboard/Dashboard";
 import Default from "./pages/default";
 
 
@@ -19,7 +20,7 @@ const Stack = createNativeStackNavigator();
 export default function App() {
   return (
     <NavigationContainer>
-      
+
       <Stack.Navigator screenOptions={{ headerShown: false }}>
 
         <Stack.Screen name="Landing" component={LandingPage} />
@@ -39,6 +40,8 @@ export default function App() {
         <Stack.Screen name="Verification" component={Verification} />
 
         <Stack.Screen name="Profile" component={Profile} />
+
+        <Stack.Screen name="Dashboard" component={Dashboard} />
         
         <Stack.Screen name="Default" component={Default} />
 

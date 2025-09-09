@@ -70,7 +70,7 @@ export default function Home({ navigation }) {
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.button}
             onPress={() => navigation.navigate("CreateBusiness")}
           >
@@ -96,27 +96,41 @@ export default function Home({ navigation }) {
                       );
 
                       console.log("🏢 Full API Response:", response.data);
-                      
+
                       const business = response.data.data;
-                      
+
                       console.log("🏢 Business object:", business);
                       console.log("🏢 Business name:", business.businessName);
                       console.log("🏢 Business logo:", business.logo);
                       console.log("🏢 Business logo_url:", business.logo_url);
-                      
+
                       // Navigate to Profile with business info
                       navigation.navigate("Profile", {
+                        businessId: business.id,
                         businessName: business.businessName,
-                        logo: business.logo, // This should contain the logo path
+                        logo: business.logo,
+                        mainCategory: business.mainCategory,
+                        subCategory: business.subCategory,
+                        region: business.region,
+                        province: business.province,
+                        city: business.city,
+                        barangay: business.barangay,
+                        postalCode: business.postalCode,
+                        addressDetails: business.addressDetails,
+                        openTime: business.openTime,
+                        closeTime: business.closeTime,
+                        verificationStatus: business.verificationStatus,
                       });
-                      
+
                       console.log("🏢 Navigating with:", {
                         businessName: business.businessName,
                         logo: business.logo,
                       });
-                      
                     } catch (err) {
-                      console.error("❌ Error fetching business details:", err.message);
+                      console.error(
+                        "❌ Error fetching business details:",
+                        err.message
+                      );
                       if (err.response) {
                         console.error("❌ Error response:", err.response.data);
                       }
@@ -128,24 +142,30 @@ export default function Home({ navigation }) {
               >
                 <Picker.Item label="-- Choose Business --" value="" />
                 {businesses.map((biz) => (
-                  <Picker.Item key={biz.id} label={biz.businessName} value={biz.id} />
+                  <Picker.Item
+                    key={biz.id}
+                    label={biz.businessName}
+                    value={biz.id}
+                  />
                 ))}
               </Picker>
             </View>
           </View>
 
-          <TouchableOpacity 
-            style={styles.button} 
+          <TouchableOpacity
+            style={styles.button}
             onPress={() => navigation.navigate("Verification")}
           >
-            <Text style={styles.buttonText}>Verification (Temporary Button)</Text>
+            <Text style={styles.buttonText}>
+              Verification (Temporary Button)
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.button} 
-            onPress={() => navigation.navigate("Profile")}
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.navigate("Dashboard")}
           >
-            <Text style={styles.buttonText}>Profile (Temporary Button)</Text>
+            <Text style={styles.buttonText}>Dashboard (Temporary Button)</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -176,7 +196,7 @@ const styles = StyleSheet.create({
     fontSize: 48,
     color: "#fff",
     fontFamily: "HessGothic-Bold",
-    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowColor: "rgba(0,0,0,0.15)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
@@ -199,7 +219,7 @@ const styles = StyleSheet.create({
     color: "#f75c3c",
     fontWeight: "600",
   },
-  
+
   // Card Styles
   card: {
     backgroundColor: "rgba(255,255,255,0.98)",
@@ -228,8 +248,8 @@ const styles = StyleSheet.create({
     borderColor: "#e9ecef",
     overflow: "hidden",
   },
-  picker: { 
-    height: 52, 
-    color: "#495057"
+  picker: {
+    height: 52,
+    color: "#495057",
   },
 });

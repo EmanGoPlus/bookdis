@@ -18,7 +18,21 @@ import { API_BASE_URL } from "../../apiConfig";
 const { width } = Dimensions.get('window');
 
 export default function Profile({ route, navigation }) {
-   const { businessName, logo } = route.params || {};
+   const {
+    businessName,
+    logo,
+    mainCategory,
+    subCategory,
+    region,
+    province,
+    city,
+    barangay,
+    postalCode,
+      addressDetails,
+    openTime,
+    closeTime,
+    verificationStatus,
+  } = route.params || {};
 
    const [image, setImage] = useState(logo || null);
    const [fontsLoaded] = useFonts({
@@ -121,28 +135,37 @@ export default function Profile({ route, navigation }) {
            </View>
 
            {/* Profile Details */}
-           <View style={styles.detailsContainer}>
-             <ProfileCard 
-               title="Business Type" 
-               value="Restaurant & Café" 
-               icon="🏪"
-             />
-             <ProfileCard 
-               title="Location" 
-               value="City of Biñan, Laguna" 
-               icon="📍"
-             />
-             <ProfileCard 
-               title="Operating Hours" 
-               value="9:00 AM - 10:00 PM" 
-               icon="⏰"
-             />
-             <ProfileCard 
-               title="Contact" 
-               value="+63 912 345 6789" 
-               icon="📞"
-             />
-           </View>
+<View style={styles.detailsContainer}>
+  <ProfileCard 
+    title="Business Type" 
+    value={`${mainCategory || ""}${subCategory ? " - " + subCategory : ""}`} 
+    icon="🏪"
+  />
+<ProfileCard 
+  title="Location" 
+  value={
+    `${addressDetails ? addressDetails + ", " : ""}` + 
+    `${barangay ? barangay + ", " : ""}` +
+    `${city ? city + ", " : ""}` +
+    `${province || ""}` +
+    `${region ? " (" + region + ")" : ""}` +
+    `${postalCode ? " - " + postalCode : ""}`
+  } 
+  icon="📍"
+/>
+
+  <ProfileCard 
+    title="Operating Hours" 
+    value={`${openTime || ""} - ${closeTime || ""}`} 
+    icon="⏰"
+  />
+  <ProfileCard 
+    title="Verification Status" 
+    value={verificationStatus ? "Verified ✅" : "Not Verified ❌"} 
+    icon="✔️"
+  />
+</View>
+
 
            {/* Action Buttons */}
            <View style={styles.actionContainer}>
