@@ -8,8 +8,9 @@ import ForgotPasswordEmail from "./pages/ForgotPasswordEmail"
 import ForgotPasswordNumber from "./pages/ForgotPasswordNumber"
 import Register from "./pages/Register"
 import Home from "./pages/Home";
-import CreateBusiness from "./pages/CreateBusiness"
-import Default from "./pages/default"
+import CreateBusiness from "./pages/CreateBusiness";
+import Verification from "./pages/Verification";
+import Default from "./pages/default";
 
 
 const Stack = createNativeStackNavigator();
@@ -29,8 +30,11 @@ export default function App() {
         <Stack.Screen name="Home" component={Home} />
 
         <Stack.Screen name="CreateBusiness" component={CreateBusiness} />
+
+        <Stack.Screen name="Verification" component={Verification} />
         
         <Stack.Screen name="Default" component={Default} />
+
 
       </Stack.Navigator>
     </NavigationContainer>

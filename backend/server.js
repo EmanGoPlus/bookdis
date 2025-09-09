@@ -1,27 +1,30 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import userRoutes from "./routes/userRoutes.js";
+import userRoutes from "./routes/merchantRoutes.js";
 import { pool } from "./db/config.js";
 
 const fastify = Fastify({
   logger: {
     transport: {
-      target: "pino-pretty", // for readable logs
-      options: {
-        translateTime: "SYS:standard",
-        ignore: "pid,hostname", 
-      },
+      target: "pino-pretty",
+      options: { translateTime: "SYS:standard", ignore: "pid,hostname" },
     },
   },
 });
 
-
-
+// Enable CORS
 await fastify.register(cors, {
-  origin: "http://localhost:5173", // your React frontend
-  methods: ["GET", "POST", "PUT", "DELETE"], // allowed methods
+  origin: "http://localhost:5173",
+  methods: ["GET", "POST", "PUT", "DELETE"],
 });
 
+// fastify.register(fastifyMultipart, {
+//   limits: {
+//     fileSize: 5 * 1024 * 1024, // 5MB limit per file
+//   },
+// });
+
+// JSON parser (optional if you want custom behavior)
 fastify.addContentTypeParser(
   "application/json",
   { parseAs: "string" },
@@ -35,7 +38,8 @@ fastify.addContentTypeParser(
   }
 );
 
-fastify.register(userRoutes, {prefix: "/api/users"});
+// Register routes
+fastify.register(userRoutes, { prefix: "/api/merchant" });
 
 const start = async () => {
   try {

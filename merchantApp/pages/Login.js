@@ -19,6 +19,7 @@ import axios from "axios";
 import ErrorModal from "../components/errorModal";
 import SuccessModal from "../components/successModal";
 import { API_BASE_URL } from "../apiConfig";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 export default function Login({ navigation }) {
@@ -65,7 +66,7 @@ export default function Login({ navigation }) {
 
   if (!fontsLoaded) return null;
 
-  const handleLogin = async () => {
+const handleLogin = async () => {
   try {
     if (!phone || !password) {
       setError("Please fill in all required fields");
@@ -74,32 +75,33 @@ export default function Login({ navigation }) {
     }
 
     const response = await axios.post(
-      `${API_BASE_URL}/api/users/merchant-login`,
+      `${API_BASE_URL}/api/merchant/login`,
       { phone, password },
       { headers: { "Content-Type": "application/json" }, timeout: 10000 }
     );
 
     console.log("Login response:", response.data);
 
+    const token = response.data.token; // JWT from backend
+
+    // ✅ Save token in AsyncStorage
+    await AsyncStorage.setItem("token", token);
+
     setSuccessMessage("Login successful!");
     setShowSuccessModal(true);
-
   } catch (err) {
     console.error("Full error object:", err);
-    console.error("Login error:", err.response?.data || err.message);
-
     let errorMessage = "Login failed. Please try again.";
-
     if (err.response) {
       errorMessage = err.response.data?.error || err.response.data?.details || errorMessage;
     } else if (err.request) {
       errorMessage = "Network error. Please check your connection.";
     }
-
     setError(errorMessage);
     setShowErrorModal(true);
   }
 };
+
 
 
   const closeErrorModal = () => {

@@ -8,21 +8,191 @@ import {
   Image,
   TouchableOpacity,
   TextInput,
-  ScrollView, // ✅ add ScrollView
+  ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 import * as ImagePicker from "expo-image-picker";
 import DropDownPicker from "react-native-dropdown-picker";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import axios from "axios";
-
+import { API_BASE_URL } from "../apiConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import ErrorModal from "../components/errorModal";
+import SuccessModal from "../components/successModal";
 import { BUSINESS_CATEGORIES } from "../datas/business-category-datas";
 
-export default function CreateBusiness() {
+export default function CreateBusiness({ navigation }) {
   const [image, setImage] = useState(null);
+  const [businessName, setBusinessName] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [addressDetails, setAddressDetails] = useState("");
+  const [error, setError] = useState(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const [fontsLoaded] = useFonts({
     "HessGothic-Bold": require("../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
   });
+
+  const handleCreateBusiness = async () => {
+    // ==== VALIDATION ====
+
+    if (!image) {
+      setError("Please upload a business logo.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!businessName.trim()) {
+      setError("Business name is required.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!selectedMainCategory && !customCategory) {
+      setError("Please select a main category.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (currentLevel === "sub" && !value && value !== "other") {
+      setError("Please select a sub-category.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (value === "other" && !customCategory.trim()) {
+      setError("Please enter your custom category.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!selectedRegion) {
+      setError("Please select a region.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!selectedProvince) {
+      setError("Please select a province.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!selectedCity) {
+      setError("Please select a city/municipality.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!selectedBarangay) {
+      setError("Please select a barangay.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!postalCode.trim() || postalCode.length !== 4 || isNaN(postalCode)) {
+      setError("Please enter a valid 4-digit postal code.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!addressDetails.trim()) {
+      setError("Please enter address details.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (openTime >= closeTime) {
+      setError("Open time must be earlier than close time.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+
+      if (image) {
+        const filename = image.split("/").pop();
+        const fileType = filename.split(".").pop();
+        formData.append("logo", {
+          uri: image,
+          name: filename,
+          type: `image/${fileType}`,
+        });
+      }
+
+      formData.append("businessName", businessName);
+      formData.append("mainCategory", selectedMainCategory || "");
+      formData.append(
+        "subCategory",
+        value === "other" ? customCategory : value || ""
+      );
+      formData.append(
+        "region",
+        regions.find((r) => r.value === selectedRegion)?.label || ""
+      );
+      formData.append(
+        "province",
+        provinces.find((p) => p.value === selectedProvince)?.label || ""
+      );
+      formData.append(
+        "city",
+        cities.find((c) => c.value === selectedCity)?.label || ""
+      );
+      formData.append(
+        "barangay",
+        barangays.find((b) => b.value === selectedBarangay)?.label || ""
+      );
+      formData.append("postalCode", postalCode || "");
+      formData.append("addressDetails", addressDetails || "");
+      formData.append("openTime", formatTime(openTime));
+      formData.append("closeTime", formatTime(closeTime));
+
+      const token = await AsyncStorage.getItem("token");
+
+      const res = await axios.post(
+        `${API_BASE_URL}/api/merchant/create-business`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // ✅ Success modal
+      setSuccessMessage("Business created successfully!");
+      setShowSuccessModal(true);
+    } catch (err) {
+      console.error(err);
+
+      // ✅ Error modal
+      setError(err.response?.data?.message || "Failed to create business.");
+      setShowErrorModal(true);
+    }
+  };
+
+  const closeErrorModal = () => setShowErrorModal(false);
+  const closeSuccessModal = () => setShowSuccessModal(false);
+
+  const resetForm = () => {
+    setImage(null);
+    setBusinessName("");
+    setPostalCode("");
+    setAddressDetails("");
+    setSelectedRegion(null);
+    setSelectedProvince(null);
+    setSelectedCity(null);
+    setSelectedBarangay(null);
+    setSelectedMainCategory(null);
+    setValue(null);
+    setCustomCategory("");
+    setOpenTime(new Date(2024, 0, 1, 9, 0));
+    setCloseTime(new Date(2024, 0, 1, 18, 0));
+  };
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -41,6 +211,11 @@ export default function CreateBusiness() {
   const [currentLevel, setCurrentLevel] = useState("main");
   const [selectedMainCategory, setSelectedMainCategory] = useState(null);
   const [customCategory, setCustomCategory] = useState("");
+
+  const [openTime, setOpenTime] = useState(new Date(2024, 0, 1, 9, 0)); // 9:00 AM
+  const [closeTime, setCloseTime] = useState(new Date(2024, 0, 1, 18, 0)); // 6:00 PM
+  const [showOpenPicker, setShowOpenPicker] = useState(false);
+  const [showClosePicker, setShowClosePicker] = useState(false);
 
   useEffect(() => {
     setItems(BUSINESS_CATEGORIES.main);
@@ -136,6 +311,15 @@ export default function CreateBusiness() {
     }
   }, [selectedCity]);
 
+  const formatTime = (date) => {
+    let hours = date.getHours();
+    let minutes = date.getMinutes();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    minutes = minutes < 10 ? "0" + minutes : minutes;
+    return `${hours}:${minutes} ${ampm}`;
+  };
+
   if (!fontsLoaded) return null;
 
   return (
@@ -162,15 +346,19 @@ export default function CreateBusiness() {
               }
               style={styles.logoImage}
             />
-            <TouchableOpacity onPress={pickImage} style={styles.uploadButton}>
-              <Text style={styles.uploadButtonText}>Upload a Logo</Text>
+            <TouchableOpacity onPress={pickImage} style={styles.button}>
+              <Text style={styles.buttonText}>Upload a Logo</Text>
             </TouchableOpacity>
           </View>
 
           {/* Business Name */}
           <Text style={styles.label}>Business Name</Text>
-          <TextInput style={styles.input} autoCapitalize="words"
-          placeholder="Enter business name" />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter business name"
+            value={businessName}
+            onChangeText={setBusinessName}
+          />
 
           {/* Category */}
           <Text style={styles.label}>
@@ -204,7 +392,7 @@ export default function CreateBusiness() {
                 {currentLevel === "main" ? "category" : "sub-category"}:
               </Text>
               <TextInput
-                style={styles.textInput}
+                style={styles.input}
                 placeholder={`Enter your ${
                   currentLevel === "main" ? "category" : "sub-category"
                 }`}
@@ -300,23 +488,112 @@ export default function CreateBusiness() {
           <Text style={styles.label}>Postal Code</Text>
           <TextInput
             style={styles.input}
-            keyboardType="numeric" // 👈 makes keyboard show numbers only
-            maxLength={4} // 👈 optional, limit postal code length (PH is 4 digits)
+            keyboardType="numeric"
+            maxLength={4}
             placeholder="Enter postal code"
+            value={postalCode}
+            onChangeText={setPostalCode}
           />
 
           <Text style={styles.label}>Address Details</Text>
-          <TextInput style={styles.input} autoCapitalize="words"
-          placeholder="Enter exact address" />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter exact address"
+            value={addressDetails}
+            onChangeText={setAddressDetails}
+          />
+
+          {/* Operating Hours */}
+
+          <View>
+            <Text style={styles.label}>Open Time</Text>
+            <TouchableOpacity
+              style={styles.input}
+              onPress={() => setShowOpenPicker(true)}
+            >
+              <Text>{formatTime(openTime)}</Text>
+            </TouchableOpacity>
+            {showOpenPicker && (
+              <DateTimePicker
+                value={openTime}
+                mode="time"
+                is24Hour={false}
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  setShowOpenPicker(false);
+                  if (selectedDate) setOpenTime(selectedDate);
+                }}
+              />
+            )}
+          </View>
+
+          <View>
+            <Text style={styles.label}>Close Time</Text>
+            <TouchableOpacity
+              style={styles.input}
+              onPress={() => setShowClosePicker(true)}
+            >
+              <Text>{formatTime(closeTime)}</Text>
+            </TouchableOpacity>
+            {showClosePicker && (
+              <DateTimePicker
+                value={closeTime}
+                mode="time"
+                is24Hour={false}
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  setShowClosePicker(false);
+                  if (selectedDate) setCloseTime(selectedDate);
+                }}
+              />
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleCreateBusiness} // 👈 call the function
+          >
+            <Text style={styles.buttonText}>Save Changes</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.button}>
+            <Text style={styles.buttonText}>Cancel</Text>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
+      <ErrorModal
+        visible={showErrorModal}
+        title="Login Failed"
+        message={error}
+        buttonText="Try Again"
+        onClose={closeErrorModal}
+        iconColor="#ff4757"
+        buttonColor="#ff4757"
+      />
+
+      <SuccessModal
+        visible={showSuccessModal}
+        message={successMessage}
+        onClose={() => {
+          setShowSuccessModal(false); // hide modal
+          resetForm(); // reset all fields
+          navigation.navigate("Verification");
+        }}
+      />
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  background: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: 20 },
+  background: {
+    flex: 1,
+  },
+
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+
   text: {
     marginTop: 45,
     fontSize: 35,
@@ -324,7 +601,12 @@ const styles = StyleSheet.create({
     fontFamily: "HessGothic-Bold",
     textAlign: "center",
   },
-  imageContainer: { alignItems: "center", marginTop: 20 },
+
+  imageContainer: {
+    alignItems: "center",
+    marginTop: 20,
+  },
+
   logoImage: {
     width: 200,
     height: 200,
@@ -332,7 +614,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
-  uploadButton: {
+
+  button: {
     marginTop: 15,
     backgroundColor: "#FFD882",
     paddingVertical: 12,
@@ -340,12 +623,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
-  uploadButtonText: {
+
+  buttonText: {
     color: "#000",
     fontSize: 16,
     fontFamily: "HessGothic-Bold",
   },
-  label: { color: "#fff", fontSize: 14, fontWeight: "600", marginTop: 15 },
+
+  label: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 15,
+  },
+
   input: {
     height: 40,
     borderWidth: 1,
@@ -354,6 +645,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 8,
     fontSize: 16,
+    justifyContent: "center", // 👈 add this
   },
-  dropdown: { marginBottom: 10 },
+
+  dropdown: {
+    marginBottom: 10,
+  },
 });

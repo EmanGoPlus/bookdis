@@ -1,5 +1,12 @@
 
 import userModel from "../models/userModel.js";
+import jwt from 'jsonwebtoken';
+import fs from "fs";
+import path from "path";
+import util from "util";
+import { pipeline } from "stream";
+
+const pump = util.promisify(pipeline);
 
 const userController = {
   async getAllUsers(req, reply) {
@@ -14,36 +21,39 @@ const userController = {
     }
   },
 
-  async merchantLogin(request, reply) {
-    try {
-      const { phone, password } = request.body;
+async merchantLogin(request, reply) {
+  try {
+    const { phone, password } = request.body;
 
-      if (!phone || !password) {
-        //check credentials
-        return reply.status(400).send({ error: "Missing fields" });
-      }
-
-      const user = await userModel.merchantLogin(phone, password);
-
-      if (!user) {
-        // check sa db
-        return reply.status(401).send({ error: "user not found" });
-      }
-
-      // const token = generateToken(user);
-
-      return reply.send({
-        message: "Login successful",
-        user: { id: user.id, phone: user.phone, role: user.role },
-        // token,
-      });
-    } catch (err) {
-      console.error("Error in logging in the merchant:", err);
-      reply
-        .status(500)
-        .send({ error: "Failed to login merchant", details: err.message });
+    if (!phone || !password) {
+      return reply.status(400).send({ error: "Missing fields" });
     }
-  },
+
+    const user = await userModel.merchantLogin(phone, password);
+
+    if (!user) {
+      return reply.status(401).send({ error: "User not found" });
+    }
+
+    // 🔑 Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return reply.send({
+      message: "Login successful",
+      user: { id: user.id, phone: user.phone, role: user.role },
+      token,  // send token to frontend
+    });
+  } catch (err) {
+    console.error("Error in logging in the merchant:", err);
+    reply
+      .status(500)
+      .send({ error: "Failed to login merchant", details: err.message });
+  }
+},
 
   async merchantRegister(request, reply) {
   try {
@@ -76,6 +86,48 @@ const userController = {
       .send({ error: "Failed to register merchant", details: err.message });
   }
 },
+
+  // async createBusiness(request, reply) {
+  //   try {
+  //     const userId = request.user?.id || request.body.userId;
+  //     if (!userId) return reply.status(400).send({ error: "User ID is required" });
+
+  //     const parts = request.parts(); // handle multipart form
+  //     let businessFields = {};
+  //     let logoPath = null;
+
+  //     for await (const part of parts) {
+  //       if (part.file) {
+  //         const uploadDir = path.join(process.cwd(), "uploads", "logo");
+  //         fs.mkdirSync(uploadDir, { recursive: true });
+
+  //         const filename = `${Date.now()}_${part.filename}`;
+  //         const filepath = path.join(uploadDir, filename);
+
+  //         await pump(part.file, fs.createWriteStream(filepath));
+  //         logoPath = `uploads/logo/${filename}`;
+  //       } else {
+  //         businessFields[part.fieldname] = part.value;
+  //       }
+  //     }
+
+  //     // Call the model — controller no longer touches db
+  //     const newBusiness = await userModel.createBusiness(userId, {
+  //       ...businessFields,
+  //       logo: logoPath,
+  //     });
+
+  //     return reply.status(201).send({
+  //       message: "Business created successfully",
+  //       business: newBusiness,
+  //     });
+  //   } catch (err) {
+  //     console.error("Error creating business:", err);
+  //     return reply.status(500).send({ error: "Failed to create business" });
+  //   }
+  // },
+
+
 
   async createUser(req, reply) {
     try {

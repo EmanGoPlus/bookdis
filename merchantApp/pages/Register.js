@@ -111,7 +111,7 @@ export default function Register({ navigation }) {
       }
 
       const response = await axios.post(
-        `${API_BASE_URL}/api/users/merchant-register`,
+        `${API_BASE_URL}/api/merchant/register`,
         { firstName, lastName, password, email, phone, role },
         {
           headers: { "Content-Type": "application/json" },

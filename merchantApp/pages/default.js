@@ -2,6 +2,8 @@ import React from "react";
 import { SafeAreaView, Text, StyleSheet, StatusBar } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
+import axios from "axios";
+import { API_BASE_URL } from "../apiConfig";
 
 export default function DefaultPage() {
   const [fontsLoaded] = useFonts({

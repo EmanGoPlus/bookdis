@@ -45,6 +45,12 @@ export default function Home({ navigation }) {
           <TouchableOpacity style={styles.button}>
             <Text style={styles.buttonText}>Select Business</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.button} onPress={() => {
+                  navigation.navigate("Verification");
+                }}>
+            <Text style={styles.buttonText}>Delete</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </LinearGradient>
