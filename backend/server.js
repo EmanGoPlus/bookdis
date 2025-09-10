@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import fastifyStatic from "@fastify/static"; // <-- import
+import fastifyStatic from "@fastify/static";
 import path from "path";
 import userRoutes from "./routes/merchantRoutes.js";
 import { pool } from "./db/config.js";

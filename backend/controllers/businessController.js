@@ -49,9 +49,9 @@ async createBusiness(request, reply) {
     }
   },
 
-async getMyBusinesses(req, reply) {
+async getMyBusinesses(request, reply) {
   try {
-    const userId = req.user.id; // comes from JWT
+    const userId = request.user.id; // comes from JWT
     const businesses = await businessModel.getBusinessesByUser(userId);
 
     return reply.send({ success: true, data: businesses });

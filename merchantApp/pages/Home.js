@@ -167,6 +167,13 @@ export default function Home({ navigation }) {
           >
             <Text style={styles.buttonText}>Dashboard (Temporary Button)</Text>
           </TouchableOpacity>
+
+                    <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.navigate("Credits")}
+          >
+            <Text style={styles.buttonText}>Credits (Temporary Button)</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </LinearGradient>

@@ -43,11 +43,14 @@ cd backend
 npm install
 npm run dev
 
+
 # Generate migration files
 npx drizzle-kit generate
 
 # Run migrations
 npx drizzle-kit migrate
+
+npx drizzle-kit push
 
 root/
  ├── merchantApp/   # React Native app for merchants

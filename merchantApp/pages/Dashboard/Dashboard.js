@@ -1,5 +1,11 @@
 import React from "react";
-import { SafeAreaView, Text, StyleSheet, StatusBar, TouchableOpacity } from "react-native";
+import {
+  SafeAreaView,
+  Text,
+  StyleSheet,
+  StatusBar,
+  TouchableOpacity,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 import axios from "axios";
@@ -37,6 +43,13 @@ export default function DefaultPage() {
 
         <TouchableOpacity
           style={styles.button}
+          onPress={() => navigation.navigate("Verification")}
+        >
+          <Text style={styles.buttonText}>CREDITS</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.button}
           onPress={() => navigation.navigate("Dashboard")}
         >
           <Text style={styles.buttonText}>SALES</Text>
@@ -48,13 +61,13 @@ export default function DefaultPage() {
           <Text style={styles.buttonText}>MEMBERS</Text>
         </TouchableOpacity>
 
-<TouchableOpacity
-  style={styles.button}
-  onPress={() => navigation.navigate("Dashboard")}
->
-  <Text style={[styles.buttonText]}>QR SCANNER</Text>
-</TouchableOpacity>
-  <Footer />
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate("Dashboard")}
+        >
+          <Text style={[styles.buttonText]}>QR SCANNER</Text>
+        </TouchableOpacity>
+        <Footer />
       </SafeAreaView>
     </LinearGradient>
   );

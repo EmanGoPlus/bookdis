@@ -34,6 +34,9 @@ export const businesses = pgTable("tbl_businesses", {
   openTime: varchar("open_time", { length: 10 }).notNull(),   // "09:00 AM"
   closeTime: varchar("close_time", { length: 10 }).notNull(), // "06:00 PM"
 
+  // here kasi isang type lang naman ng credits. wag na iseperate
+  creditsBalance: integer("credits_balance").default(0).notNull(), //
+
   // status
   verificationStatus: boolean("is_verified").default(false).notNull(),
 });
@@ -50,5 +53,25 @@ export const businessDocuments = pgTable("tbl_business_documents", {
 createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const creditTransactions = pgTable("tbl_credit_transactions", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").references(() => businesses.id).notNull(),
+  type: varchar("type", { length: 20 }).notNull(),
+  amount: integer("amount").notNull(), // +1000 for purchase, -10 for deduction
+  description: varchar("description", { length: 255 }), // e.g. "To: Member ID 8453627843"
+  referenceNo: varchar("reference_no", { length: 100 }), // PayMongo RN, internal ref, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const creditPackages = pgTable("tbl_credit_packages", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 50 }).notNull(),
+  credits: integer("credits").notNull(),
+  price: integer("price").notNull(), // stored in centavos
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 
 

@@ -12,6 +12,7 @@ import CreateBusiness from "./pages/CreateBusiness";
 import Verification from "./pages/Verification";
 import Profile from "./pages/Account/Profile";
 import Dashboard from "./pages/Dashboard/Dashboard";
+import Credits from "./pages/Dashboard/Credits"
 import Default from "./pages/default";
 
 
@@ -42,8 +43,12 @@ export default function App() {
         <Stack.Screen name="Profile" component={Profile} />
 
         <Stack.Screen name="Dashboard" component={Dashboard} />
+
+        <Stack.Screen name="Credits" component={Credits} />
         
         <Stack.Screen name="Default" component={Default} />
+
+
 
       </Stack.Navigator>
 
