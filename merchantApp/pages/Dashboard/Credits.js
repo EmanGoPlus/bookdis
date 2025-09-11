@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   SafeAreaView,
   Text,
@@ -16,10 +16,17 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { UserContext } from "../../context/AuthContext";
 import { API_BASE_URL } from "../../apiConfig";
 
 export default function Credits({ route, navigation }) {
-  const { businessId, businessName } = route.params || {};
+  // Get data from both route params AND context as fallback
+  const { user, business } = useContext(UserContext);
+  const routeParams = route.params || {};
+  
+  // Determine businessId and businessName from multiple sources
+  const businessId = routeParams.businessId || business?.id || user?.businessId;
+  const businessName = routeParams.businessName || business?.businessName || "Business";
   
   const [fontsLoaded] = useFonts({
     "HessGothic-Bold": require("../../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
@@ -35,33 +42,33 @@ export default function Credits({ route, navigation }) {
 
   if (!fontsLoaded) return null;
 
-  // Fetch credit data from backend
   const fetchCreditData = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
       
-      // Debug logs
-      console.log("🔍 BusinessId:", businessId);
-      console.log("🔍 API_BASE_URL:", API_BASE_URL);
+      console.log("🔍 Credits - BusinessId:", businessId);
+      console.log("🔍 Credits - BusinessName:", businessName);
+      console.log("🔍 Credits - API_BASE_URL:", API_BASE_URL);
       
       if (!businessId) {
+        console.log("❌ Credits - No businessId found from any source");
         Alert.alert("Error", "No business selected");
         navigation.goBack();
         return;
       }
       
       const token = await AsyncStorage.getItem("token");
-      console.log("🔍 Token exists:", !!token);
+      console.log("🔍 Credits - Token exists:", !!token);
       
       if (!token) {
         Alert.alert("Error", "Please login again");
-        navigation.navigate("Login");
+        // Don't navigate manually - let AuthContext handle it
         return;
       }
 
-      // CORRECTED API ENDPOINT - this was the main issue!
+      // CORRECTED API ENDPOINT - matching your backend routes
       const url = `${API_BASE_URL}/api/merchant/business/${businessId}/credits`;
-      console.log("🔍 Full API URL:", url);
+      console.log("🔍 Credits - Full API URL:", url);
 
       const response = await axios.get(url, {
         headers: {
@@ -69,24 +76,22 @@ export default function Credits({ route, navigation }) {
         },
       });
 
-      console.log("✅ Credits API response:", response.data);
+      console.log("✅ Credits - API response:", response.data);
       
-      // Set the data
       const responseData = response.data;
       setCreditData({
         balance: responseData.balance || 0,
         history: responseData.history || [],
         totalTransactions: responseData.totalTransactions || 0,
-        businessName: responseData.businessName
+        businessName: responseData.businessName || businessName
       });
       
     } catch (error) {
-      console.error("❌ Error fetching credit data:", error.response?.data || error.message);
-      console.error("❌ Error status:", error.response?.status);
+      console.error("❌ Credits - API Error:", error);
       
       if (error.response?.status === 401) {
         Alert.alert("Error", "Session expired. Please login again");
-        navigation.navigate("Login");
+        // Don't navigate manually - let AuthContext handle it
       } else if (error.response?.status === 404) {
         Alert.alert("Error", "Business not found or access denied");
         navigation.goBack();
@@ -107,16 +112,22 @@ export default function Credits({ route, navigation }) {
 
   useEffect(() => {
     console.log("🔍 Credits component mounted");
-    console.log("🔍 Route params:", route.params);
-    console.log("🔍 BusinessId from params:", businessId);
-    console.log("🔍 BusinessName from params:", businessName);
+    console.log("🔍 Credits - Route params:", route.params);
+    console.log("🔍 Credits - Context business:", business);
+    console.log("🔍 Credits - Context user:", user);
+    console.log("🔍 Credits - Final businessId:", businessId);
+    console.log("🔍 Credits - Final businessName:", businessName);
     
     if (businessId) {
       fetchCreditData();
     } else {
-      console.log("❌ No businessId found in route params");
-      Alert.alert("Error", "No business ID found");
-      navigation.goBack();
+      console.log("❌ Credits - No businessId found from any source");
+      Alert.alert("Error", "No business ID found", [
+        {
+          text: "Go Back",
+          onPress: () => navigation.goBack()
+        }
+      ]);
     }
   }, [businessId]);
 

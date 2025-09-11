@@ -1,6 +1,5 @@
-
 import userModel from "../models/userModel.js";
-import jwt from 'jsonwebtoken';
+import jwt from "jsonwebtoken";
 import fs from "fs";
 import path from "path";
 import util from "util";
@@ -9,7 +8,7 @@ import { pipeline } from "stream";
 const pump = util.promisify(pipeline);
 
 const userController = {
-  async getAllUsers(req, reply) {
+  async getAllUsers(request, reply) {
     try {
       const users = await userModel.getAllUsers();
       reply.send(users);
@@ -21,7 +20,7 @@ const userController = {
     }
   },
 
-async merchantLogin(request, reply) {
+async login(request, reply) {
   try {
     const { phone, password } = request.body;
 
@@ -29,105 +28,79 @@ async merchantLogin(request, reply) {
       return reply.status(400).send({ error: "Missing fields" });
     }
 
-    const user = await userModel.merchantLogin(phone, password);
+    const user =
+      (await userModel.employeeLogin(phone, password)) ||
+      (await userModel.merchantLogin(phone, password));
 
     if (!user) {
       return reply.status(401).send({ error: "User not found" });
     }
 
-    // 🔑 Generate JWT token
+    // 🪪 Generate token - CHANGED: Use 'id' instead of 'userId' to match middleware
     const token = jwt.sign(
-      { userId: user.id, role: user.role },
+      { 
+        id: user.id,           // CHANGED: from 'userId' to 'id'
+        role: user.role, 
+        businessId: user.businessId 
+      },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" }
     );
 
     return reply.send({
       message: "Login successful",
-      user: { id: user.id, phone: user.phone, role: user.role },
-      token,  // send token to frontend
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        role: user.role,
+        businessId: user.businessId,
+      },
+      token,
     });
   } catch (err) {
-    console.error("Error in logging in the merchant:", err);
+    console.error("Error in login:", err);
     reply
       .status(500)
-      .send({ error: "Failed to login merchant", details: err.message });
+      .send({ error: "Failed to login", details: err.message });
   }
 },
 
   async merchantRegister(request, reply) {
-  try {
-    const { firstName, lastName, password, email, phone, role } = request.body;
+    try {
+      const { firstName, lastName, password, email, phone, role } =
+        request.body;
 
-    if (!firstName || !lastName || !password || !email || !phone) {
-      return reply.status(400).send({ error: "Missing fields" });
+      if (!firstName || !lastName || !password || !email || !phone) {
+        return reply.status(400).send({ error: "Missing fields" });
+      }
+
+      const existingUser = await userModel.getUserByPhone(phone);
+      if (existingUser) {
+        return reply.status(409).send({ error: "User already exists" });
+      }
+
+      // Insert new merchant
+      const newMerchant = await userModel.merchantRegister(
+        firstName,
+        lastName,
+        password,
+        email,
+        phone,
+        role || "merchant"
+      );
+
+      return reply
+        .status(201)
+        .send({ message: "Merchant registered", user: newMerchant });
+    } catch (err) {
+      console.error("Error in registering the merchant:", err);
+      return reply
+        .status(500)
+        .send({ error: "Failed to register merchant", details: err.message });
     }
-
-    const existingUser = await userModel.getUserByPhone(phone);
-    if (existingUser) {
-      return reply.status(409).send({ error: "User already exists" });
-    }
-
-    // Insert new merchant
-    const newMerchant = await userModel.merchantRegister(
-      firstName,
-      lastName,
-      password,
-      email,
-      phone,
-      role || "merchant"
-    );
-
-    return reply.status(201).send({ message: "Merchant registered", user: newMerchant });
-  } catch (err) {
-    console.error("Error in registering the merchant:", err);
-    return reply
-      .status(500)
-      .send({ error: "Failed to register merchant", details: err.message });
-  }
-},
-
-  // async createBusiness(request, reply) {
-  //   try {
-  //     const userId = request.user?.id || request.body.userId;
-  //     if (!userId) return reply.status(400).send({ error: "User ID is required" });
-
-  //     const parts = request.parts(); // handle multipart form
-  //     let businessFields = {};
-  //     let logoPath = null;
-
-  //     for await (const part of parts) {
-  //       if (part.file) {
-  //         const uploadDir = path.join(process.cwd(), "uploads", "logo");
-  //         fs.mkdirSync(uploadDir, { recursive: true });
-
-  //         const filename = `${Date.now()}_${part.filename}`;
-  //         const filepath = path.join(uploadDir, filename);
-
-  //         await pump(part.file, fs.createWriteStream(filepath));
-  //         logoPath = `uploads/logo/${filename}`;
-  //       } else {
-  //         businessFields[part.fieldname] = part.value;
-  //       }
-  //     }
-
-  //     // Call the model — controller no longer touches db
-  //     const newBusiness = await userModel.createBusiness(userId, {
-  //       ...businessFields,
-  //       logo: logoPath,
-  //     });
-
-  //     return reply.status(201).send({
-  //       message: "Business created successfully",
-  //       business: newBusiness,
-  //     });
-  //   } catch (err) {
-  //     console.error("Error creating business:", err);
-  //     return reply.status(500).send({ error: "Failed to create business" });
-  //   }
-  // },
-
-
+  },
 
   async createUser(req, reply) {
     try {

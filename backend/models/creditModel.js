@@ -1,6 +1,7 @@
 import db from "../db/config.js";
-import { eq, desc } from "drizzle-orm";
-import { businesses, creditTransactions } from "../db/schema.js";
+import { eq, desc, and } from "drizzle-orm";
+
+import { merchants, businesses, creditTransactions } from "../db/schema.js";
 
 const creditModel = {
   // Get credit balance for a business
@@ -34,19 +35,65 @@ const creditModel = {
     return history;
   },
 
-  // Check if business exists and belongs to user
-  async checkBusinessOwnership(businessId, userId) {
-    const [business] = await db
-      .select({ 
-        id: businesses.id, 
-        userId: businesses.userId,
-        businessName: businesses.businessName
-      })
-      .from(businesses)
-      .where(eq(businesses.id, businessId))
-      .limit(1);
+  // Check if business exists and user has access (merchant owner OR employee)
+  async checkBusinessAccess(businessId, userId, userRole) {
+    console.log("🔍 checkBusinessAccess called with:", { businessId, userId, userRole });
     
-    return business && business.userId === userId ? business : null;
+    if (userRole === 'merchant') {
+      // For merchants, check ownership
+      const [business] = await db
+        .select({ 
+          id: businesses.id, 
+          userId: businesses.userId,
+          businessName: businesses.businessName
+        })
+        .from(businesses)
+        .where(eq(businesses.id, businessId))
+        .limit(1);
+      
+      console.log("🔍 Merchant business check result:", business);
+      return business && business.userId === userId ? business : null;
+      
+    } else if (userRole === 'employee') {
+      // For employees, check if they belong to this business
+      console.log("🔍 Checking employee access...");
+      
+      const [employee] = await db
+        .select({ 
+          id: merchants.id,
+          businessId: merchants.businessId,
+          role: merchants.role
+        })
+        .from(merchants)
+        .where(and(
+          eq(merchants.id, userId),
+          eq(merchants.businessId, businessId),
+          eq(merchants.role, 'employee')
+        ))
+        .limit(1);
+
+      console.log("🔍 Employee check result:", employee);
+
+      if (employee) {
+        // Get business details
+        const [business] = await db
+          .select({ 
+            id: businesses.id, 
+            businessName: businesses.businessName
+          })
+          .from(businesses)
+          .where(eq(businesses.id, businessId))
+          .limit(1);
+        
+        console.log("🔍 Business details for employee:", business);
+        return business || null;
+      }
+      
+      return null;
+    }
+    
+    console.log("🔍 Unknown role or no role provided");
+    return null;
   }
 };
 

@@ -7,17 +7,17 @@ import fastifyMultipart from "@fastify/multipart";
 async function userRoutes(fastify, options) {
   fastify.register(fastifyMultipart, {
     limits: {
-      fileSize: 6 * 1024 * 1024, // 6 MB max per file
+      fileSize: 6 * 1024 * 1024,
     },
   });
 
-    //=============================USERS=============================
+  //=============================USERS=============================
 
-  fastify.post("/login", userController.merchantLogin);
+  fastify.post("/login", userController.login);
 
   fastify.post("/register", userController.merchantRegister);
 
-    //=============================BUSINESS=============================
+  //=============================BUSINESS=============================
 
   fastify.post("/create-business", {
     preHandler: authenticateToken, // JWT middleware / requires login
@@ -36,7 +36,6 @@ async function userRoutes(fastify, options) {
     businessController.uploadDocuments
   );
 
-  // Get documents for a business
   fastify.get("/documents/:businessId", {
     preHandler: authenticateToken,
     handler: businessController.getDocuments,
@@ -48,21 +47,16 @@ async function userRoutes(fastify, options) {
     businessController.getBusinessById
   );
 
-
   //=============================CREDITS=============================
-
-  // Get credits balance and history for a business
   fastify.get("/business/:id/credits", {
     preHandler: authenticateToken,
-    handler: creditController.getCredits
+    handler: creditController.getCredits,
   });
 
-  // Get only credit transaction history for a business
   fastify.get("/business/:id/credits-history", {
     preHandler: authenticateToken,
-    handler: creditController.getHistory
+    handler: creditController.getHistory,
   });
 }
-
 
 export default userRoutes;

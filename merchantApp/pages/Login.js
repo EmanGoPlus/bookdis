@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   SafeAreaView,
   Text,
@@ -19,8 +19,7 @@ import axios from "axios";
 import ErrorModal from "../components/errorModal";
 import SuccessModal from "../components/successModal";
 import { API_BASE_URL } from "../apiConfig";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { UserContext } from "../context/AuthContext";
 
 export default function Login({ navigation }) {
   const [phone, setPhone] = useState("");
@@ -31,16 +30,18 @@ export default function Login({ navigation }) {
   const [successMessage, setSuccessMessage] = useState("");
   const [keyboardOffset] = useState(new Animated.Value(0));
 
+  const { login } = useContext(UserContext);
+
   const [fontsLoaded] = useFonts({
     "HessGothic-Bold": require("../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
   });
 
   useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (event) => {
         Animated.timing(keyboardOffset, {
-          duration: Platform.OS === 'ios' ? event.duration : 250,
+          duration: Platform.OS === "ios" ? event.duration : 250,
           toValue: -event.endCoordinates.height / 2,
           useNativeDriver: false,
         }).start();
@@ -48,10 +49,10 @@ export default function Login({ navigation }) {
     );
 
     const keyboardWillHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       (event) => {
         Animated.timing(keyboardOffset, {
-          duration: Platform.OS === 'ios' ? event.duration : 250,
+          duration: Platform.OS === "ios" ? event.duration : 250,
           toValue: 0,
           useNativeDriver: false,
         }).start();
@@ -82,27 +83,94 @@ const handleLogin = async () => {
 
     console.log("Login response:", response.data);
 
-    const token = response.data.token; // JWT from backend
+    const { token, user } = response.data;
+    const role = user.role;
 
-    // ✅ Save token in AsyncStorage
-    await AsyncStorage.setItem("token", token);
+    console.log("🔍 Login - Extracted data:", {
+      user: user.firstName || user.phone,
+      role,
+      businessId: user.businessId || null,
+    });
 
-    setSuccessMessage("Login successful!");
-    setShowSuccessModal(true);
+    if (role === "employee") {
+      
+      if (!user.businessId) {
+        console.error("❌ Employee login missing businessId");
+        setError("Employee account setup incomplete. Contact admin.");
+        setShowErrorModal(true);
+        return;
+      }
+
+      try {
+        // Fetch business data for employee
+        console.log("🏪 Fetching business data for employee...");
+        const businessResponse = await axios.get(
+          `${API_BASE_URL}/api/merchant/business/${user.businessId}`,
+          {
+            headers: { 
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json" 
+            },
+            timeout: 10000
+          }
+        );
+
+        // FIX: Extract business data correctly - it might be nested under 'data' or 'business'
+        const businessData = businessResponse.data.business || 
+                           businessResponse.data.data || 
+                           businessResponse.data;
+        
+        console.log("✅ Business data fetched:", businessData);
+
+        // Store the business data correctly in AuthContext
+        await login(user, token, role, businessData);
+
+        // DON'T navigate manually - let AppNavigator handle it with conditional rendering
+        console.log("✅ Employee login complete - navigation will be handled automatically");
+
+      } catch (businessError) {
+        console.error("❌ Failed to fetch business data:", businessError);
+        setError("Failed to load business information. Please try again.");
+        setShowErrorModal(true);
+        return;
+      }
+
+    } else if (role === "merchant") {
+      console.log("🏪 Merchant login - no business pre-selected");
+      
+      await login(user, token, role, null);
+      
+      await AsyncStorage.removeItem("business");
+      
+      // DON'T navigate manually for merchants either
+      console.log("✅ Merchant login complete - navigation will be handled automatically");
+      
+    } else {
+      console.warn("⚠️ Unknown role:", role);
+      await login(user, token, role, null);
+    }
+
   } catch (err) {
     console.error("Full error object:", err);
     let errorMessage = "Login failed. Please try again.";
+    
     if (err.response) {
-      errorMessage = err.response.data?.error || err.response.data?.details || errorMessage;
+      console.error("Response error:", err.response.data);
+      errorMessage = err.response.data?.error || 
+                    err.response.data?.message || 
+                    err.response.data?.details || 
+                    errorMessage;
     } else if (err.request) {
+      console.error("Request error:", err.request);
       errorMessage = "Network error. Please check your connection.";
+    } else {
+      console.error("Setup error:", err.message);
     }
+    
     setError(errorMessage);
     setShowErrorModal(true);
   }
 };
-
-
 
   const closeErrorModal = () => {
     setShowErrorModal(false);
@@ -182,7 +250,6 @@ const handleLogin = async () => {
         </ScrollView>
       </Animated.View>
 
-      {/* Using the ErrorModal component */}
       <ErrorModal
         visible={showErrorModal}
         title="Login Failed"
@@ -196,10 +263,7 @@ const handleLogin = async () => {
       <SuccessModal
         visible={showSuccessModal}
         message={successMessage}
-        onClose={() => {
-          setShowSuccessModal(false);
-          navigation.navigate("Home");
-        }}
+        onClose={() => setShowSuccessModal(false)}
       />
     </LinearGradient>
   );
@@ -216,7 +280,7 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
 
   container: {

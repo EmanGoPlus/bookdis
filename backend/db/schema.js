@@ -7,8 +7,10 @@ export const merchants = pgTable("tbl_merchants", {
   password: varchar("password").notNull(),
   email: varchar("email", { length: 100 }).notNull(),
   phone: varchar("phone", { length: 11 }).unique(),
-  role: varchar("role", { length: 50 }).default("merchant"),
+  role: varchar("role", { length: 50 }).default("merchant"), // merchant or employee
+  businessId: integer("business_id").references(() => businesses.id), // optional, only for employees
 });
+
 
 export const businesses = pgTable("tbl_businesses", {
   id: serial("id").primaryKey(),

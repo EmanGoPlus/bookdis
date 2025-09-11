@@ -7,7 +7,6 @@ import { businessDocuments } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 
 const userModel = {
-  
   async getUserByPhone(phone) {
     const result = await db
       .select()
@@ -17,9 +16,26 @@ const userModel = {
     return result[0] || null;
   },
 
+  async employeeLogin(phone, password) {
+
+    const result = await db
+    .select({
+      id: merchants.id,
+      firstName: merchants.firstName,
+      lastName: merchants.lastName,
+      phone: merchants.phone,
+      role: merchants.role,
+      businessId: merchants.businessId
+    })
+    .from(merchants)
+    .where(and(eq(merchants.phone, phone), eq(merchants.password, password)));
+
+    return result[0] || null;
+  },
+
   async merchantLogin(phone, password) {
     const result = await db
-      .select()
+      .select() //dito pa lang twag na lahat; select all from to!
       .from(merchants)
       .where(and(eq(merchants.phone, phone), eq(merchants.password, password)));
 
@@ -38,9 +54,9 @@ const userModel = {
       const result = await db
         .insert(merchants)
         .values({
-          firstName, // This maps to first_name column
-          lastName, // This maps to last_name column
-          password, // Remember to hash this before saving!
+          firstName,
+          lastName,
+          password,
           email,
           phone,
           role,
@@ -54,7 +70,6 @@ const userModel = {
           role: merchants.role,
         });
 
-      // Check if insert was successful
       if (!result || result.length === 0) {
         throw new Error("Failed to insert merchant - no data returned");
       }
@@ -65,8 +80,6 @@ const userModel = {
       throw error;
     }
   },
-
-  
 };
 
 export default userModel;

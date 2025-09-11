@@ -5,7 +5,6 @@ import { eq, and } from "drizzle-orm";
 
 const businessModel = {
 
-  //: Fetch a single business by its unique
   async getBusinessById(businessId) {
     try {
       const result = await db
@@ -21,23 +20,20 @@ const businessModel = {
     }
   },
 
-  //Fetch all businesses that belong to a given user.
   async getBusinessesByUser(userId) {
-  try {
-    const result = await db
-      .select()
-      .from(businesses)
-      .where(eq(businesses.userId, userId));
+    try {
+      const result = await db
+        .select()
+        .from(businesses)
+        .where(eq(businesses.userId, userId));
 
-    return result;
-  } catch (error) {
-    console.error("❌ Error in businessModel.getBusinessesByUser:", error);
-    throw error;
-  }
-},
+      return result;
+    } catch (error) {
+      console.error("❌ Error in businessModel.getBusinessesByUser:", error);
+      throw error;
+    }
+  },
 
-
-    
   async createBusiness(userId, businessData) {
     try {
       const {
@@ -100,8 +96,7 @@ const businessModel = {
     }
   },
 
-  // Create a new document record
-async uploadDocuments(businessId, docs) {
+  async uploadDocuments(businessId, docs) {
     try {
       const { governmentID, businessPermit, DTI, taxID } = docs;
 
@@ -130,7 +125,9 @@ async uploadDocuments(businessId, docs) {
         });
 
       if (!result || result.length === 0) {
-        throw new Error("Failed to insert business documents - no data returned");
+        throw new Error(
+          "Failed to insert business documents - no data returned"
+        );
       }
 
       return result[0];
@@ -140,7 +137,6 @@ async uploadDocuments(businessId, docs) {
     }
   },
 
-  // Get documents by business
   async getByBusiness(businessId) {
     try {
       const result = await db
@@ -154,7 +150,6 @@ async uploadDocuments(businessId, docs) {
     }
   },
 
-  // Update documents (overwrite files, reset verification)
   async updateByBusiness(businessId, docs) {
     try {
       const result = await db
@@ -181,7 +176,6 @@ async uploadDocuments(businessId, docs) {
     }
   },
 
-  // Admin: mark as verified or rejected
   async setStatus(documentId, verified, reason) {
     try {
       const result = await db

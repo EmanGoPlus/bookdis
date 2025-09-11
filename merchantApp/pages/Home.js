@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   SafeAreaView,
   Text,
@@ -14,22 +14,33 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 import { Picker } from "@react-native-picker/picker";
 import { API_BASE_URL } from "../apiConfig";
+import { UserContext } from "../context/AuthContext";
 
 export default function Home({ navigation }) {
   const [businesses, setBusinesses] = useState([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState("");
+  const { user, selectBusiness, isMerchant, logout } = useContext(UserContext);
+
   const [fontsLoaded] = useFonts({
     "HessGothic-Bold": require("../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
   });
 
-  if (!fontsLoaded) return null;
+  // if (!fontsLoaded) return null;
 
   useEffect(() => {
+    // Only merchants should be on this page
+    if (!isMerchant()) {
+      console.log("⚠️ Non-merchant user redirected from Home");
+      navigation.navigate("Default");
+      return;
+    }
+
     const fetchBusinesses = async () => {
       try {
         const token = await AsyncStorage.getItem("token");
         if (!token) {
           console.log("⚠️ No token found in AsyncStorage");
+          navigation.navigate("Login");
           return;
         }
 
@@ -41,15 +52,72 @@ export default function Home({ navigation }) {
         );
 
         console.log("✅ Businesses response:", response.data);
-
         setBusinesses(response.data.data || []);
       } catch (err) {
         console.error("❌ Error fetching businesses:", err.message);
+        if (err.response?.status === 401) {
+          // Token expired or invalid
+          await logout();
+          navigation.navigate("Login");
+        }
       }
     };
 
     fetchBusinesses();
   }, []);
+
+  const handleBusinessSelection = async (itemValue) => {
+    setSelectedBusinessId(itemValue);
+
+    if (itemValue) {
+      try {
+        const token = await AsyncStorage.getItem("token");
+        const response = await axios.get(
+          `${API_BASE_URL}/api/merchant/business/${itemValue}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        console.log("🏢 Full API Response:", response.data);
+        const business = response.data.data;
+
+        // Store selected business in context
+        await selectBusiness(business);
+
+        console.log("🏢 Business selected:", business.businessName);
+
+        // Navigate to Dashboard with business data as parameters
+        navigation.navigate("Dashboard", {
+          businessId: business.id,
+          businessName: business.businessName,
+          logo: business.logo,
+          mainCategory: business.mainCategory,
+          subCategory: business.subCategory,
+          region: business.region,
+          province: business.province,
+          city: business.city,
+          barangay: business.barangay,
+          postalCode: business.postalCode,
+          addressDetails: business.addressDetails,
+          openTime: business.openTime,
+          closeTime: business.closeTime,
+          verificationStatus: business.verificationStatus,
+          creditsBalance: business.creditsBalance,
+        });
+      } catch (err) {
+        console.error("❌ Error fetching business details:", err.message);
+        if (err.response) {
+          console.error("❌ Error response:", err.response.data);
+        }
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigation.navigate("Login");
+  };
 
   return (
     <LinearGradient
@@ -67,6 +135,11 @@ export default function Home({ navigation }) {
         <View style={styles.headerContainer}>
           <Text style={styles.headerText}>Welcome to</Text>
           <Text style={styles.headerText}>Bookdis</Text>
+          {user && (
+            <Text style={styles.userGreeting}>
+              Hello, {user.firstName || user.phone}!
+            </Text>
+          )}
         </View>
 
         <View style={styles.buttonContainer}>
@@ -82,61 +155,7 @@ export default function Home({ navigation }) {
             <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={selectedBusinessId}
-                onValueChange={async (itemValue) => {
-                  setSelectedBusinessId(itemValue);
-
-                  if (itemValue) {
-                    try {
-                      const token = await AsyncStorage.getItem("token");
-                      const response = await axios.get(
-                        `${API_BASE_URL}/api/merchant/business/${itemValue}`,
-                        {
-                          headers: { Authorization: `Bearer ${token}` },
-                        }
-                      );
-
-                      console.log("🏢 Full API Response:", response.data);
-
-                      const business = response.data.data;
-
-                      console.log("🏢 Business object:", business);
-                      console.log("🏢 Business name:", business.businessName);
-                      console.log("🏢 Business logo:", business.logo);
-                      console.log("🏢 Business logo_url:", business.logo_url);
-
-                      // Navigate to Profile with business info
-                      navigation.navigate("Profile", {
-                        businessId: business.id,
-                        businessName: business.businessName,
-                        logo: business.logo,
-                        mainCategory: business.mainCategory,
-                        subCategory: business.subCategory,
-                        region: business.region,
-                        province: business.province,
-                        city: business.city,
-                        barangay: business.barangay,
-                        postalCode: business.postalCode,
-                        addressDetails: business.addressDetails,
-                        openTime: business.openTime,
-                        closeTime: business.closeTime,
-                        verificationStatus: business.verificationStatus,
-                      });
-
-                      console.log("🏢 Navigating with:", {
-                        businessName: business.businessName,
-                        logo: business.logo,
-                      });
-                    } catch (err) {
-                      console.error(
-                        "❌ Error fetching business details:",
-                        err.message
-                      );
-                      if (err.response) {
-                        console.error("❌ Error response:", err.response.data);
-                      }
-                    }
-                  }
-                }}
+                onValueChange={handleBusinessSelection}
                 style={styles.picker}
                 dropdownIconColor="#666"
               >
@@ -150,29 +169,18 @@ export default function Home({ navigation }) {
                 ))}
               </Picker>
             </View>
+            {businesses.length === 0 && (
+              <Text style={styles.noBusiness}>
+                No businesses found. Add your first business!
+              </Text>
+            )}
           </View>
 
           <TouchableOpacity
-            style={styles.button}
-            onPress={() => navigation.navigate("Verification")}
+            style={[styles.button, styles.logout]}
+            onPress={handleLogout}
           >
-            <Text style={styles.buttonText}>
-              Verification (Temporary Button)
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => navigation.navigate("Dashboard")}
-          >
-            <Text style={styles.buttonText}>Dashboard (Temporary Button)</Text>
-          </TouchableOpacity>
-
-                    <TouchableOpacity
-            style={styles.button}
-            onPress={() => navigation.navigate("Credits")}
-          >
-            <Text style={styles.buttonText}>Credits (Temporary Button)</Text>
+            <Text style={[styles.text, styles.logoutText]}>Logout</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -207,6 +215,12 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  userGreeting: {
+    fontSize: 16,
+    color: "#fff",
+    marginTop: 10,
+    opacity: 0.9,
+  },
   button: {
     backgroundColor: "#fff",
     paddingVertical: 18,
@@ -220,14 +234,20 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  buttonText: {
+  text: {
     fontFamily: "HessGothic-Bold",
     fontSize: 16,
-    color: "#f75c3c",
     fontWeight: "600",
+    color: "#f75c3c",
+  },
+  logout: {
+    backgroundColor: "#f75c3c",
+    borderWidth: 0,
+  },
+  logoutText: {
+    color: "#fff",
   },
 
-  // Card Styles
   card: {
     backgroundColor: "rgba(255,255,255,0.98)",
     borderRadius: 20,
@@ -246,8 +266,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
   },
-
-  // Picker Styles
   pickerContainer: {
     backgroundColor: "#f8f9fa",
     borderRadius: 14,
@@ -258,5 +276,11 @@ const styles = StyleSheet.create({
   picker: {
     height: 52,
     color: "#495057",
+  },
+  noBusiness: {
+    textAlign: "center",
+    color: "#666",
+    fontStyle: "italic",
+    marginTop: 10,
   },
 });
