@@ -20,52 +20,52 @@ const userController = {
     }
   },
 
-async login(request, reply) {
-  try {
-    const { phone, password } = request.body;
+  async login(request, reply) {
+    try {
+      const { phone, password } = request.body;
 
-    if (!phone || !password) {
-      return reply.status(400).send({ error: "Missing fields" });
+      if (!phone || !password) {
+        return reply.status(400).send({ error: "Missing fields" });
+      }
+
+      const user =
+        (await userModel.employeeLogin(phone, password)) ||
+        (await userModel.merchantLogin(phone, password));
+
+      if (!user) {
+        return reply.status(401).send({ error: "User not found" });
+      }
+
+      // 🪪 Generate token - CHANGED: Use 'id' instead of 'userId' to match middleware
+      const token = jwt.sign(
+        {
+          id: user.id, // CHANGED: from 'userId' to 'id'
+          role: user.role,
+          businessId: user.businessId,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      return reply.send({
+        message: "Login successful",
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          role: user.role,
+          businessId: user.businessId,
+        },
+        token,
+      });
+    } catch (err) {
+      console.error("Error in login:", err);
+      reply
+        .status(500)
+        .send({ error: "Failed to login", details: err.message });
     }
-
-    const user =
-      (await userModel.employeeLogin(phone, password)) ||
-      (await userModel.merchantLogin(phone, password));
-
-    if (!user) {
-      return reply.status(401).send({ error: "User not found" });
-    }
-
-    // 🪪 Generate token - CHANGED: Use 'id' instead of 'userId' to match middleware
-    const token = jwt.sign(
-      { 
-        id: user.id,           // CHANGED: from 'userId' to 'id'
-        role: user.role, 
-        businessId: user.businessId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    return reply.send({
-      message: "Login successful",
-      user: {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phone: user.phone,
-        role: user.role,
-        businessId: user.businessId,
-      },
-      token,
-    });
-  } catch (err) {
-    console.error("Error in login:", err);
-    reply
-      .status(500)
-      .send({ error: "Failed to login", details: err.message });
-  }
-},
+  },
 
   async merchantRegister(request, reply) {
     try {

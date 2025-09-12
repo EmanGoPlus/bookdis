@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useContext } from "react";
 import {
   SafeAreaView,
   Text,
@@ -9,15 +9,52 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  Platform
 } from "react-native";
 
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 import { API_BASE_URL } from "../../apiConfig";
+import Footer from "../../components/footer";
+import { UserContext } from "../../context/AuthContext"; // Add this import
 
 const { width } = Dimensions.get("window");
 
-export default function Profile({ route, navigation }) {
+export default function Profile({ navigation }) {
+  // Get data from Context instead of route params
+  const { business, user, userRole, hasSelectedBusiness } = useContext(UserContext);
+  
+  const [fontsLoaded] = useFonts({
+    "HessGothic-Bold": require("../../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
+  });
+
+  if (!fontsLoaded) return null;
+
+  // Handle case where no business is selected (mainly for merchants)
+  if (!hasSelectedBusiness()) {
+    return (
+      <LinearGradient
+        colors={["#ffce54", "#fda610", "#f75c3c"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.background}
+      >
+        <SafeAreaView style={[styles.container, { paddingBottom: 0 }]}>
+          <View style={styles.noBusiness}>
+            <Text style={styles.noBusinessText}>No business selected</Text>
+            <TouchableOpacity 
+              style={styles.selectBusinessButton}
+              onPress={() => navigation.navigate("BusinessSelection")}
+            >
+              <Text style={styles.selectBusinessButtonText}>Select Business</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
+
+  // Extract business data from context
   const {
     businessName,
     logo,
@@ -32,20 +69,12 @@ export default function Profile({ route, navigation }) {
     openTime,
     closeTime,
     verificationStatus,
-  } = route.params || {};
-
-  const [image, setImage] = useState(logo || null);
-  const [fontsLoaded] = useFonts({
-    "HessGothic-Bold": require("../../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
-  });
-
-  if (!fontsLoaded) return null;
+    id: businessId
+  } = business;
 
   // Debug: Log the logo URL to see what's being constructed
   const logoUrl = logo ? `${API_BASE_URL}/${logo}` : null;
   console.log("🖼️ Logo URL:", logoUrl);
-  console.log("🖼️ API_BASE_URL:", API_BASE_URL);
-  console.log("🖼️ Logo path:", logo);
 
   const handleBackPress = () => {
     navigation.goBack();
@@ -63,7 +92,7 @@ export default function Profile({ route, navigation }) {
 
   const handleGoToCredits = () => {
     navigation.navigate("Credits", {
-      businessId: route.params?.businessId || route.params?.id, // Make sure to pass the business ID
+      businessId: businessId,
       businessName: businessName,
     });
   };
@@ -141,9 +170,15 @@ export default function Profile({ route, navigation }) {
 
             <View style={styles.businessInfo}>
               <Text style={styles.businessName}>
-                {businessName || "Custom Business Name"}
+                {businessName || "Business Name"}
               </Text>
-              <Text style={styles.businessSubtitle}>Not Verified</Text>
+              <Text style={styles.businessSubtitle}>
+                {verificationStatus ? "Verified ✅" : "Not Verified"}
+              </Text>
+              {/* Show user role info */}
+              <Text style={styles.userRoleText}>
+                Logged in as: {userRole === "merchant" ? "Owner" : "Employee"}
+              </Text>
             </View>
           </View>
 
@@ -191,6 +226,7 @@ export default function Profile({ route, navigation }) {
 
           <View style={styles.bottomPadding} />
         </ScrollView>
+        <Footer />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -204,39 +240,72 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  // No Business State
+  noBusiness: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 48,
+  },
+  noBusinessText: {
+    fontSize: 22,
+    color: "#fff",
+    fontFamily: "HessGothic-Bold",
+    textAlign: "center",
+    marginBottom: 24,
+    letterSpacing: 0.5,
+  },
+  selectBusinessButton: {
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  selectBusinessButtonText: {
+    color: "#f75c3c",
+    fontSize: 17,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+
   // Header Styles
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 12,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.25)",
     alignItems: "center",
     justifyContent: "center",
   },
   backButtonText: {
-    fontSize: 24,
+    fontSize: 22,
     color: "#fff",
     fontWeight: "bold",
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     color: "#fff",
     fontFamily: "HessGothic-Bold",
     fontWeight: "600",
   },
   menuButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.25)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -249,37 +318,38 @@ const styles = StyleSheet.create({
   // Scroll Content
   scrollContent: {
     paddingHorizontal: 20,
+    paddingBottom: 30,
   },
 
   // Profile Section
   profileSection: {
     alignItems: "center",
-    paddingVertical: 30,
+    paddingVertical: 24,
   },
   logoContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   logoWrapper: {
     position: "relative",
   },
   logoImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 4,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 3,
     borderColor: "#fff",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
   },
   logoOverlay: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
@@ -287,59 +357,64 @@ const styles = StyleSheet.create({
     borderColor: "#f75c3c",
   },
   logoEditText: {
-    fontSize: 16,
+    fontSize: 14,
   },
   businessInfo: {
     alignItems: "center",
   },
   businessName: {
-    fontSize: 28,
+    fontSize: 26,
     color: "#fff",
     fontFamily: "HessGothic-Bold",
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 8,
-    textShadowColor: "rgba(0,0,0,0.3)",
+    marginBottom: 6,
+    textShadowColor: "rgba(0,0,0,0.25)",
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 3,
   },
   businessSubtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: "rgba(255,255,255,0.9)",
-    marginBottom: 12,
+    marginBottom: 4,
+  },
+  userRoleText: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.8)",
+    marginBottom: 10,
   },
 
   // Details Container
   detailsContainer: {
-    marginBottom: 30,
+    marginBottom: 24,
   },
   profileCard: {
     backgroundColor: "rgba(255,255,255,0.95)",
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   cardIcon: {
-    fontSize: 20,
-    marginRight: 12,
+    fontSize: 18,
+    marginRight: 10,
   },
   cardTitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#666",
     fontWeight: "600",
     textTransform: "uppercase",
   },
   cardValue: {
-    fontSize: 18,
+    fontSize: 16,
     color: "#333",
     fontWeight: "bold",
   },
@@ -349,8 +424,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   actionButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
     borderRadius: 12,
     marginBottom: 12,
     alignItems: "center",
@@ -358,11 +433,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.3)",
   },
   actionButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
   },
 
   bottomPadding: {
-    height: 20,
+    height: 16,
   },
 });

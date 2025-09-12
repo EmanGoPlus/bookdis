@@ -10,7 +10,8 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
-  FlatList
+  FlatList,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
@@ -18,6 +19,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { UserContext } from "../../context/AuthContext";
 import { API_BASE_URL } from "../../apiConfig";
+import Footer from "../../components/footer";
 
 export default function Credits({ route, navigation }) {
   // Get data from both route params AND context as fallback
@@ -292,6 +294,7 @@ export default function Credits({ route, navigation }) {
 
           <View style={styles.bottomPadding} />
         </ScrollView>
+        <Footer />
       </SafeAreaView>
     </LinearGradient>
   );

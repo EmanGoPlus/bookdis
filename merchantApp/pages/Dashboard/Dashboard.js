@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
@@ -14,6 +15,7 @@ import { UserContext } from "../../context/AuthContext";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../../apiConfig";
+import Footer from "../../components/footer";
 
 export default function Dashboard({ route, navigation }) {
   const { user, business, userRole, logout } = useContext(UserContext);
@@ -257,7 +259,10 @@ export default function Dashboard({ route, navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+      
+
       </SafeAreaView>
+       <Footer  />
     </LinearGradient>
   );
 }

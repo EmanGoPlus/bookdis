@@ -51,7 +51,7 @@ export const businessDocuments = pgTable("tbl_business_documents", {
   DTI: varchar("dti_sec", { length: 255 }),
   taxID: varchar("tax_id", { length: 255 }),
   isVerified: boolean("is_verified").default(false),
-  rejectedReason: varchar("rejected_reason", { length: 255 }), // optional
+  rejectedReason: varchar("rejected_reason", { length: 255 }),
 createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

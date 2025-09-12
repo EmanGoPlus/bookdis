@@ -1,24 +1,32 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { View, TouchableOpacity, Text, StyleSheet, Dimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { FontAwesome5, MaterialIcons, Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
+import * as NavigationBar from "expo-navigation-bar";
 
 const { width } = Dimensions.get("window");
 
-export default function Footer() {
+export default function Footer({ style }) {
   const navigation = useNavigation();
 
-const buttons = [
-  { name: "Dashboard", icon: <MaterialIcons name="dashboard" size={24} color="#fff" /> },
-  { name: "Products", icon: <FontAwesome5 name="box" size={24} color="#fff" /> },
-  { name: "Promos", icon: <MaterialIcons name="local-offer" size={24} color="#fff" /> },
-  { name: "Notifications", icon: <Ionicons name="notifications-outline" size={24} color="#fff" /> },
-  { name: "Profile", icon: <FontAwesome5 name="user-alt" size={24} color="#fff" /> },
-];
+  // Set Android navigation bar color to black with white icons
+  useEffect(() => {
+    NavigationBar.setBackgroundColorAsync("#000"); // black background
+    NavigationBar.setButtonStyleAsync("light");    // white icons
+  }, []);
 
+  // Footer buttons
+  const buttons = [
+    { name: "Dashboard", icon: <MaterialIcons name="dashboard" size={24} color="#fff" /> },
+    { name: "Products", icon: <FontAwesome5 name="box" size={24} color="#fff" /> },
+    { name: "Promos", icon: <MaterialIcons name="local-offer" size={24} color="#fff" /> },
+    { name: "Notifications", icon: <Ionicons name="notifications-outline" size={24} color="#fff" /> },
+    { name: "Profile", icon: <FontAwesome5 name="user-alt" size={24} color="#fff" /> },
+  ];
 
   return (
-    <View style={styles.footerContainer}>
+    <SafeAreaView edges={["bottom"]} style={[styles.footerContainer, style]}>
       {buttons.map((btn, index) => (
         <TouchableOpacity
           key={index}
@@ -30,7 +38,7 @@ const buttons = [
           <Text style={styles.buttonText}>{btn.name}</Text>
         </TouchableOpacity>
       ))}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -40,10 +48,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     backgroundColor: "#f75c3c",
-    paddingVertical: 10,
+    paddingVertical: 12,
     width: width,
-    position: "absolute",
-    bottom: 0,
   },
   button: {
     alignItems: "center",
@@ -52,7 +58,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#fff",
     fontSize: 12,
-    marginTop: 2,
     fontWeight: "600",
   },
 });
