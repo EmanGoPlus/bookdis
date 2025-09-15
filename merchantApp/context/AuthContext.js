@@ -17,7 +17,7 @@ export const UserProvider = ({ children }) => {
         const businessData = await AsyncStorage.getItem("business");
         const roleData = await AsyncStorage.getItem("userRole");
 
-        console.log("🔍 AuthContext - Loading from AsyncStorage:", {
+        console.log("AuthContext - Loading from AsyncStorage:", {
           hasToken: !!token,
           userData: userData ? JSON.parse(userData) : null,
           businessData: businessData ? JSON.parse(businessData) : null,
@@ -29,23 +29,25 @@ export const UserProvider = ({ children }) => {
           console.log("✅ AuthContext - Setting user:", parsedUser);
           setUser(parsedUser);
         }
-        
+
         if (businessData) {
           const parsedBusiness = JSON.parse(businessData);
-          // FIX: Handle nested business data structure
           const actualBusiness = parsedBusiness.data || parsedBusiness;
           console.log("✅ AuthContext - Setting business:", actualBusiness);
           setBusiness(actualBusiness);
         }
-        
+
         if (roleData) {
           console.log("✅ AuthContext - Setting role:", roleData);
           setUserRole(roleData);
         }
-        
+
         console.log("🔍 AuthContext - Final loaded state:", {
           user: userData ? JSON.parse(userData).firstName : null,
-          business: businessData ? JSON.parse(businessData).businessName || JSON.parse(businessData).data?.businessName : null,
+          business: businessData
+            ? JSON.parse(businessData).businessName ||
+              JSON.parse(businessData).data?.businessName
+            : null,
           role: roleData,
         });
       } catch (err) {
@@ -63,7 +65,10 @@ export const UserProvider = ({ children }) => {
       console.log("🔄 AuthContext - Login called with:", {
         user: userData.firstName,
         role,
-        business: businessData?.businessName || businessData?.data?.businessName || null,
+        business:
+          businessData?.businessName ||
+          businessData?.data?.businessName ||
+          null,
       });
 
       await AsyncStorage.setItem("token", token);
@@ -77,7 +82,7 @@ export const UserProvider = ({ children }) => {
       if (businessData) {
         // Store the business data as-is for now, we'll normalize it when loading
         await AsyncStorage.setItem("business", JSON.stringify(businessData));
-        
+
         // FIX: Handle nested structure when setting state
         const actualBusiness = businessData.data || businessData;
         setBusiness(actualBusiness);

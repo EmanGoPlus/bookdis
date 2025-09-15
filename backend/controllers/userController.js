@@ -1,11 +1,26 @@
 import userModel from "../models/userModel.js";
+import businessModel from "../models/businessModel.js";
 import jwt from "jsonwebtoken";
 import fs from "fs";
 import path from "path";
 import util from "util";
+import crypto from "crypto";
 import { pipeline } from "stream";
+import bcrypt from "bcrypt";
+import { employees } from "../db/schema.js";
 
 const pump = util.promisify(pipeline);
+
+function generateRandomPassword(length = 5) {
+  const charset = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let password = "";
+  
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  
+  return password;
+}
 
 const userController = {
   async getAllUsers(request, reply) {
@@ -17,6 +32,92 @@ const userController = {
       reply
         .status(500)
         .send({ error: "Failed to fetch users", details: err.message });
+    }
+  },
+
+  async merchantLogin(request, reply) {
+    try {
+      const { phone, password } = request.body;
+
+      if (!phone || !password) {
+        return reply.status(400).send({ error: "Missing fields" });
+      }
+
+      const merchant = await userModel.merchantLogin(phone, password);
+
+      if (!merchant) {
+        return reply.status(401).send({ error: "Merchant not found" });
+      }
+
+      const token = jwt.sign(
+        {
+          id: merchant.id,
+          role: merchant.role,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      return reply.send({
+        message: "Login successful",
+        user: {
+          id: merchant.id,
+          firstName: merchant.firstName,
+          lastName: merchant.lastName,
+          phone: merchant.phone,
+          role: merchant.role,
+        },
+        token,
+      });
+    } catch (err) {
+      console.error("Error in login:", err);
+      reply
+        .status(500)
+        .send({ error: "Failed to login", details: err.message });
+    }
+  },
+
+  async employeeLogin(request, reply) {
+    try {
+      const { username, password } = request.body;
+
+      if (!username || !password) {
+        return reply.status(400).send({ error: "Missing fieldsss" });
+      }
+
+      const employee = await userModel.employeeLogin(username, password);
+
+      if (!employee) {
+        return reply.status(401).send({ error: "employee not found" });
+      }
+
+      const token = jwt.sign(
+        {
+          id: employee.id,
+          role: employee.role,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      return reply.send({
+        message: "Login successful",
+        user: {
+          id: employee.id,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
+          phone: employee.phone,
+          username: employee.username,
+          role: employee.role,
+          businessId: employee.businessId, // Change this line from business_id to businessId
+        },
+        token,
+      });
+    } catch (err) {
+      console.error("Error in login:", err);
+      reply
+        .status(500)
+        .send({ error: "Failed to login", details: err.message });
     }
   },
 
@@ -99,6 +200,50 @@ const userController = {
       return reply
         .status(500)
         .send({ error: "Failed to register merchant", details: err.message });
+    }
+  },
+
+  async employeeRegister(request, reply) {
+    try {
+      const { firstName, lastName, businessId } = request.body;
+
+      // remove "password" from required fields
+      if (!firstName || !lastName || !businessId) {
+        return reply.status(400).send({ error: "Missing required fields" });
+      }
+
+      const business = await businessModel.getBusinessById(businessId);
+      if (!business) {
+        return reply.status(404).send({ error: "Business not found" });
+      }
+
+      const username =
+        `${business.businessCode}-` +
+        `${firstName[0].toUpperCase()}` +
+        `${firstName.slice(-1).toUpperCase()}` +
+        `${lastName[0].toUpperCase()}` +
+        `${lastName.slice(-1).toUpperCase()}`;
+
+      // 🔑 Auto-generate password here
+      const plainPassword = generateRandomPassword(5);
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+      const employee = await userModel.addEmployee(
+        firstName,
+        lastName,
+        username,
+        hashedPassword,
+        businessId
+      );
+
+      // Return plain password only once
+      return reply.status(201).send({
+        message: "Employee registered",
+        employee: { ...employee, password: plainPassword },
+      });
+    } catch (err) {
+      console.error("Error in registerEmployee:", err);
+      return reply.status(500).send({ error: "Failed to register employee" });
     }
   },
 

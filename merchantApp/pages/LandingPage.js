@@ -39,9 +39,16 @@ export default function LandingPage({ navigation }) {
         <SafeAreaView style={styles.buttonWrapper}>
           <TouchableOpacity
             style={styles.button}
-            onPress={() => navigation.navigate("Login")}
+            onPress={() => navigation.navigate("MerchantLogin")}
           >
-            <Text style={styles.buttonText}>Log in</Text>
+            <Text style={styles.buttonText}>Log in as Owner</Text>
+          </TouchableOpacity>
+
+               <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.navigate("EmployeeLogin")}
+          >
+            <Text style={styles.buttonText}>Log in as Employee</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

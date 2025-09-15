@@ -1,4 +1,4 @@
-// middlewares/auth.js
+
 import jwt from 'jsonwebtoken';
 
 const authenticateToken = (req, reply, done) => {
@@ -12,18 +12,16 @@ const authenticateToken = (req, reply, done) => {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     
-    // DEBUG: Log the payload to see what's actually in the token
+
     console.log("🔍 JWT Payload:", payload);
     
     req.user = { 
-      // FIX: Use either payload.id or payload.userId depending on how you create the token
       id: payload.id || payload.userId, 
       role: payload.role,
       businessId: payload.businessId,
       phone: payload.phone // Include phone if available
     };
     
-    // DEBUG: Log what we're setting in req.user
     console.log("🔍 Setting req.user:", req.user);
     
     done();

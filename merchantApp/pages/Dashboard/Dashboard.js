@@ -102,7 +102,7 @@ export default function Dashboard({ route, navigation }) {
       const token = await AsyncStorage.getItem("token");
 
       const response = await axios.get(
-        `${API_BASE_URL}/api/merchant/business/${user.businessId}`,
+        `${API_BASE_URL}/api/user/business/${user.businessId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

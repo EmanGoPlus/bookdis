@@ -163,7 +163,7 @@ export default function CreateBusiness({ navigation }) {
       const token = await AsyncStorage.getItem("token");
 
       const res = await axios.post(
-        `${API_BASE_URL}/api/merchant/create-business`,
+        `${API_BASE_URL}/api/user/create-business`,
         formData,
         {
           headers: {

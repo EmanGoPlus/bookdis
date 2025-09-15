@@ -1,10 +1,8 @@
-// src/models/userModel.js
 import { GelBigInt64 } from "drizzle-orm/gel-core";
 import db from "../db/config.js";
-import { merchants } from "../db/schema.js";
-import { businesses } from "../db/schema.js";
-import { businessDocuments } from "../db/schema.js";
+import { merchants, employees } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
+import bcrypt from "bcrypt";
 
 const userModel = {
   async getUserByPhone(phone) {
@@ -16,30 +14,36 @@ const userModel = {
     return result[0] || null;
   },
 
-  async employeeLogin(phone, password) {
-
+  async employeeLogin(username, password) {
+    // First find the employee by username only
     const result = await db
-    .select({
-      id: merchants.id,
-      firstName: merchants.firstName,
-      lastName: merchants.lastName,
-      phone: merchants.phone,
-      role: merchants.role,
-      businessId: merchants.businessId
-    })
-    .from(merchants)
-    .where(and(eq(merchants.phone, phone), eq(merchants.password, password)));
+      .select()
+      .from(employees)
+      .where(eq(employees.username, username));
 
-    return result[0] || null;
+    const employee = result[0];
+
+    if (!employee) {
+      return null;
+    }
+
+    // Compare the provided password with the hashed password
+    const isValidPassword = await bcrypt.compare(password, employee.password);
+
+    if (!isValidPassword) {
+      return null;
+    }
+
+    return employee;
   },
 
   async merchantLogin(phone, password) {
     const result = await db
-      .select() //dito pa lang twag na lahat; select all from to!
+      .select()
       .from(merchants)
       .where(and(eq(merchants.phone, phone), eq(merchants.password, password)));
 
-    return result[0] || null; //returns the 1st row kahit naka unique naman lol crazy
+    return result[0] || null;
   },
 
   async merchantRegister(
@@ -62,6 +66,7 @@ const userModel = {
           role,
         })
         .returning({
+          //auto fetch, idk how is it useful though kapag neeed mo agad yung data after insert
           id: merchants.id,
           firstName: merchants.firstName,
           lastName: merchants.lastName,
@@ -79,6 +84,35 @@ const userModel = {
       console.error("Database error in merchantRegister:", error);
       throw error;
     }
+  },
+
+  async addEmployee(
+    firstName,
+    lastName,
+    username,
+    password,
+    businessId,
+    role = "employee"
+  ) {
+    const result = await db
+      .insert(employees)
+      .values({
+        firstName,
+        lastName,
+        username,
+        password, // already hashed
+        businessId,
+        role,
+      })
+      .returning({
+        id: employees.id,
+        firstName: employees.firstName,
+        lastName: employees.lastName,
+        username: employees.username,
+        role: employees.role,
+      });
+
+    return result[0]; // return the new employee
   },
 };
 

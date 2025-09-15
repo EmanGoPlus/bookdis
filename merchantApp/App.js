@@ -7,7 +7,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Screens
 import LandingPage from "./pages/LandingPage";
-import Login from "./pages/Login";
+import MerchantLogin from "./pages/Public/MerchantLogin";
+import EmployeeLogin from "./pages/Public/EmployeeLogin";
 import ForgotPasswordEmail from "./pages/ForgotPasswordEmail";
 import ForgotPasswordNumber from "./pages/ForgotPasswordNumber";
 import Register from "./pages/Register";
@@ -17,6 +18,7 @@ import Verification from "./pages/Verification";
 import Profile from "./pages/Account/Profile";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import Credits from "./pages/Dashboard/Credits";
+import AddEmployee from "./pages/Account/AddEmployee";
 import Default from "./pages/default";
 
 const Stack = createNativeStackNavigator();
@@ -51,9 +53,7 @@ function AppNavigator() {
   } else if (userRole === "employee") {
     console.log("🔄 AppNavigator - Employee user, showing Dashboard first");
   } else {
-    console.log(
-      "⚠️ AppNavigator - Unknown role or missing role, showing Default"
-    );
+    console.log("AppNavigator - Unknown role or missing role, showing Default");
   }
 
   return (
@@ -63,7 +63,8 @@ function AppNavigator() {
           // Guest / Auth Stack
           <>
             <Stack.Screen name="Landing" component={LandingPage} />
-            <Stack.Screen name="Login" component={Login} />
+            <Stack.Screen name="MerchantLogin" component={MerchantLogin} />
+            <Stack.Screen name="EmployeeLogin" component={EmployeeLogin} />
             <Stack.Screen
               name="ForgotPasswordEmail"
               component={ForgotPasswordEmail}
@@ -83,6 +84,7 @@ function AppNavigator() {
             <Stack.Screen name="Verification" component={Verification} />
             <Stack.Screen name="Profile" component={Profile} />
             <Stack.Screen name="Credits" component={Credits} />
+            <Stack.Screen name="AddEmployee" component={AddEmployee} />
           </>
         ) : userRole === "employee" ? (
           // Employee Flow - Dashboard first, then other screens

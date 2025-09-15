@@ -3,8 +3,27 @@ import { businesses } from "../db/schema.js";
 import { businessDocuments } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 
-const businessModel = {
+async function generateBusinessCode() {
+  let code;
+  let exists = true;
 
+  while (exists) {
+    code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const existing = await db
+      .select()
+      .from(businesses)
+      .where(eq(businesses.businessCode, code));
+
+    exists = existing.length > 0;
+  }
+
+  return code;
+}
+
+const businessModel = {
+  
+  //1business
   async getBusinessById(businessId) {
     try {
       const result = await db
@@ -20,6 +39,7 @@ const businessModel = {
     }
   },
 
+  //owner
   async getBusinessesByUser(userId) {
     try {
       const result = await db
@@ -51,10 +71,13 @@ const businessModel = {
         closeTime,
       } = businessData;
 
+      const businessCode = await generateBusinessCode();
+
       const result = await db
         .insert(businesses)
         .values({
           userId,
+          businessCode,
           businessName,
           mainCategory,
           subCategory,
@@ -70,6 +93,7 @@ const businessModel = {
         })
         .returning({
           id: businesses.id,
+          businessCode: businesses.businessCode,
           businessName: businesses.businessName,
           mainCategory: businesses.mainCategory,
           subCategory: businesses.subCategory,
@@ -142,7 +166,7 @@ const businessModel = {
       const result = await db
         .select()
         .from(businessDocuments)
-        .where(eq(businessDocuments.businessId, businessId)); // ✅ Fixed: Use eq() function consistently
+        .where(eq(businessDocuments.businessId, businessId));
       return result;
     } catch (error) {
       console.error("Database error in getByBusiness:", error);

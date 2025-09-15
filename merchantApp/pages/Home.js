@@ -28,7 +28,7 @@ export default function Home({ navigation }) {
   // if (!fontsLoaded) return null;
 
   useEffect(() => {
-    // Only merchants should be on this page
+
     if (!isMerchant()) {
       console.log("⚠️ Non-merchant user redirected from Home");
       navigation.navigate("Default");
@@ -45,7 +45,7 @@ export default function Home({ navigation }) {
         }
 
         const response = await axios.get(
-          `${API_BASE_URL}/api/merchant/my-businesses`,
+          `${API_BASE_URL}/api/user/merchant/my-businesses`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -73,7 +73,7 @@ export default function Home({ navigation }) {
       try {
         const token = await AsyncStorage.getItem("token");
         const response = await axios.get(
-          `${API_BASE_URL}/api/merchant/business/${itemValue}`,
+          `${API_BASE_URL}/api/user/business/${itemValue}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -175,6 +175,13 @@ export default function Home({ navigation }) {
               </Text>
             )}
           </View>
+
+                    <TouchableOpacity
+            style={styles.button}
+            onPress={() => navigation.navigate("AddEmployee")}
+          >
+            <Text style={styles.buttonText}>Add Employee</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.button, styles.logout]}

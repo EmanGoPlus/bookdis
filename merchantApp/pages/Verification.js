@@ -44,7 +44,7 @@ useEffect(() => {
       }
 
       const response = await axios.get(
-        `${API_BASE_URL}/api/merchant/my-businesses`,
+        `${API_BASE_URL}/api/user/my-businesses`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -163,7 +163,7 @@ useEffect(() => {
 
       console.log("🌐 Making API call...");
       const response = await axios.post(
-        `${API_BASE_URL}/api/merchant/upload-documents`,
+        `${API_BASE_URL}/api/user/upload-documents`,
         formData,
         {
           headers: {

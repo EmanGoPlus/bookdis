@@ -2,7 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import path from "path";
-import userRoutes from "./routes/merchantRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
 import { pool } from "./db/config.js";
 
 const fastify = Fastify({
@@ -27,7 +27,7 @@ await fastify.register(fastifyStatic, {
 });
 
 // Register routes
-fastify.register(userRoutes, { prefix: "/api/merchant" });
+fastify.register(userRoutes, { prefix: "/api/user" });
 
 // PostgreSQL + start server
 const start = async () => {

@@ -8,6 +8,7 @@ import { pipeline } from "stream";
 const pump = util.promisify(pipeline);
 
 const businessController = {
+
   async createBusiness(request, reply) {
     try {
       const userId = request.user?.id || request.body.userId;
@@ -52,6 +53,7 @@ const businessController = {
   async getMyBusinesses(request, reply) {
     try {
       const userId = request.user.id; // comes from JWT
+
       const businesses = await businessModel.getBusinessesByUser(userId);
 
       return reply.send({ success: true, data: businesses });
@@ -173,7 +175,7 @@ const businessController = {
     }
   },
 
-  async getBusinessById(request, reply) {
+  async getBusinessById(request, reply) { //for employee
     try {
       const { businessId } = request.params;
 

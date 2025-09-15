@@ -69,7 +69,7 @@ export default function Credits({ route, navigation }) {
       }
 
       // CORRECTED API ENDPOINT - matching your backend routes
-      const url = `${API_BASE_URL}/api/merchant/business/${businessId}/credits`;
+      const url = `${API_BASE_URL}/api/user/business/${businessId}/credits`;
       console.log("🔍 Credits - Full API URL:", url);
 
       const response = await axios.get(url, {
