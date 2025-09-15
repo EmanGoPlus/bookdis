@@ -1,6 +1,8 @@
 import userController from "../controllers/userController.js";
 import businessController from "../controllers/businessController.js";
 import creditController from "../controllers/creditController.js";
+import permissionController from "../controllers/permissionController.js";
+
 import authenticateToken from "../middlewares/auth.js";
 import fastifyMultipart from "@fastify/multipart";
 
@@ -49,6 +51,18 @@ async function userRoutes(fastify, options) {
     "/business/:businessId",
     { preHandler: authenticateToken },
     businessController.getBusinessById
+  );
+
+  //=============================Permissions=============================
+
+  fastify.post(
+    "/permissions/toggle",
+    permissionController.toggleElementVisibility
+  );
+
+  fastify.get(
+    "/permissions/check/:employeeId/:elementKey",
+    permissionController.checkElementVisibility
   );
 
   //=============================CREDITS=============================

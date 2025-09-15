@@ -7,7 +7,7 @@ const connectionString = `postgresql://${process.env.PG_USER}:${process.env.PG_P
 export default {
   schema: "./db/schema.js",
   out: "./drizzle",
-  dialect: "postgresql",   //change from driver to dialect
+  dialect: "postgresql",
   dbCredentials: {
     url: connectionString, //use url instead of connectionString
   },

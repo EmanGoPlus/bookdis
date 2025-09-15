@@ -33,7 +33,7 @@ export default function AddEmployee({ navigation }) {
   const [generatedUsername, setGeneratedUsername] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState("");
 
-  const { isMerchant } = useContext(UserContext);
+  const { user, userRole, isMerchant } = useContext(UserContext);
 
   const [fontsLoaded] = useFonts({
     "HessGothic-Bold": require("../../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
@@ -89,16 +89,20 @@ export default function AddEmployee({ navigation }) {
 
       const response = await axios.post(
         `${API_BASE_URL}/api/user/employee-register`,
-        { firstName, lastName, businessId: selectedBusinessId },
+        {
+          firstName,
+          lastName,
+          businessId: selectedBusinessId,
+          role: "employee", 
+          createdBy: user?.id,
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // ✅ Save generated credentials from API
       setGeneratedUsername(response.data.employee.username);
       setGeneratedPassword(response.data.employee.password);
       setShowSuccessModal(true);
 
-      // Reset form
       setFirstName("");
       setLastName("");
       setSelectedBusinessId("");
@@ -173,7 +177,6 @@ export default function AddEmployee({ navigation }) {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Error Modal */}
       <ErrorModal
         visible={showErrorModal}
         title="Error"
@@ -184,12 +187,10 @@ export default function AddEmployee({ navigation }) {
         buttonColor="#ff4757"
       />
 
-      {/* Success Modal */}
       <Modal visible={showSuccessModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>✅ Employee Registered!</Text>
-
             <Text>Username: {generatedUsername}</Text>
             <Text>Password: {generatedPassword}</Text>
 

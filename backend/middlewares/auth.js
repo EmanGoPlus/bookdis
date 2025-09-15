@@ -19,10 +19,9 @@ const authenticateToken = (req, reply, done) => {
       id: payload.id || payload.userId, 
       role: payload.role,
       businessId: payload.businessId,
-      phone: payload.phone // Include phone if available
     };
     
-    console.log("🔍 Setting req.user:", req.user);
+    console.log("Setting req.user:", req.user);
     
     done();
   } catch (err) {

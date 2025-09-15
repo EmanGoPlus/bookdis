@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 const userModel = {
+
   async getUserByPhone(phone) {
     const result = await db
       .select()
@@ -15,7 +16,7 @@ const userModel = {
   },
 
   async employeeLogin(username, password) {
-    // First find the employee by username only
+
     const result = await db
       .select()
       .from(employees)
@@ -46,45 +47,29 @@ const userModel = {
     return result[0] || null;
   },
 
-  async merchantRegister(
-    firstName,
-    lastName,
-    password,
-    email,
-    phone,
-    role = "merchant"
-  ) {
-    try {
-      const result = await db
-        .insert(merchants)
-        .values({
-          firstName,
-          lastName,
-          password,
-          email,
-          phone,
-          role,
-        })
-        .returning({
-          //auto fetch, idk how is it useful though kapag neeed mo agad yung data after insert
-          id: merchants.id,
-          firstName: merchants.firstName,
-          lastName: merchants.lastName,
-          email: merchants.email,
-          phone: merchants.phone,
-          role: merchants.role,
-        });
+  async merchantRegister(firstName, lastName, password, email, phone, role = "merchant") {
+  const hashedPassword = await bcrypt.hash(password, 10);
+  
+  const result = await db.insert(merchants)
+    .values({
+      firstName,
+      lastName,
+      password: hashedPassword, // store hashed
+      email,
+      phone,
+      role,
+    })
+    .returning({
+      id: merchants.id,
+      firstName: merchants.firstName,
+      lastName: merchants.lastName,
+      email: merchants.email,
+      phone: merchants.phone,
+      role: merchants.role,
+    });
 
-      if (!result || result.length === 0) {
-        throw new Error("Failed to insert merchant - no data returned");
-      }
-
-      return result[0];
-    } catch (error) {
-      console.error("Database error in merchantRegister:", error);
-      throw error;
-    }
-  },
+  return result[0];
+},
 
   async addEmployee(
     firstName,

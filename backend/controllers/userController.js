@@ -23,6 +23,7 @@ function generateRandomPassword(length = 5) {
 }
 
 const userController = {
+
   async getAllUsers(request, reply) {
     try {
       const users = await userModel.getAllUsers();
@@ -53,6 +54,7 @@ const userController = {
         {
           id: merchant.id,
           role: merchant.role,
+          // businessId: merchant.businessId
         },
         process.env.JWT_SECRET,
         { expiresIn: "7d" }
@@ -95,6 +97,7 @@ const userController = {
         {
           id: employee.id,
           role: employee.role,
+          businessId: employee.businessId,
         },
         process.env.JWT_SECRET,
         { expiresIn: "7d" }
@@ -207,7 +210,6 @@ const userController = {
     try {
       const { firstName, lastName, businessId } = request.body;
 
-      // remove "password" from required fields
       if (!firstName || !lastName || !businessId) {
         return reply.status(400).send({ error: "Missing required fields" });
       }
@@ -224,7 +226,6 @@ const userController = {
         `${lastName[0].toUpperCase()}` +
         `${lastName.slice(-1).toUpperCase()}`;
 
-      // 🔑 Auto-generate password here
       const plainPassword = generateRandomPassword(5);
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
@@ -236,7 +237,6 @@ const userController = {
         businessId
       );
 
-      // Return plain password only once
       return reply.status(201).send({
         message: "Employee registered",
         employee: { ...employee, password: plainPassword },

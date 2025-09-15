@@ -132,5 +132,30 @@ export const creditPackages = pgTable("tbl_credit_packages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ----------------------
+// Products/Service
+// ----------------------
 
+export const products = pgTable("tbl_products", {
+  id: serial("id").primaryKey(),
+
+  // Link to business
+  businessId: integer("business_id").references(() => businesses.id).notNull(),
+
+  // Basic info
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"), // longer text
+  category: varchar("category", { length: 50 }), // optional category
+  price: integer("price").notNull(), // stored in centavos or smallest currency unit
+  isActive: boolean("is_active").default(true).notNull(),
+
+  // Optional image
+  imageUrl: varchar("image_url", { length: 255 }),
+
+  // Stock / inventory (optional)
+  stock: integer("stock").default(0),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
