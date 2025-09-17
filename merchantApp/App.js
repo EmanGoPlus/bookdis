@@ -6,14 +6,13 @@ import { ActivityIndicator, View, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Screens
-import LandingPage from "./pages/LandingPage";
-import MerchantLogin from "./pages/Public/MerchantLogin";
-import EmployeeLogin from "./pages/Public/EmployeeLogin";
+import Landing from "./pages/Public/Landing"
+import Login from "./pages/Public/Login";
 import ForgotPasswordEmail from "./pages/ForgotPasswordEmail";
 import ForgotPasswordNumber from "./pages/ForgotPasswordNumber";
 import Register from "./pages/Register";
-import Home from "./pages/Home";
-import CreateBusiness from "./pages/CreateBusiness";
+import Home from "./pages/Account/Home";
+import CreateBusiness from "./pages/Account/CreateBusiness";
 import Verification from "./pages/Verification";
 import Profile from "./pages/Account/Profile";
 import Dashboard from "./pages/Dashboard/Dashboard";
@@ -36,7 +35,7 @@ function LoadingScreen() {
 function AppNavigator() {
   const { user, userRole, business, loading } = useContext(UserContext);
 
-  console.log("🔍 AppNavigator - Current state:", {
+  console.log("AppNavigator - Current state:", {
     user: user ? `${user.firstName} (${user.phone})` : "null",
     userRole,
     business: business ? business.businessName : "null",
@@ -45,7 +44,6 @@ function AppNavigator() {
 
   if (loading) return <LoadingScreen />;
 
-  // Debug the navigation decision
   if (!user) {
     console.log("🔄 AppNavigator - No user, showing auth screens");
   } else if (userRole === "merchant") {
@@ -62,9 +60,9 @@ function AppNavigator() {
         {!user ? (
           // Guest / Auth Stack
           <>
-            <Stack.Screen name="Landing" component={LandingPage} />
-            <Stack.Screen name="MerchantLogin" component={MerchantLogin} />
-            <Stack.Screen name="EmployeeLogin" component={EmployeeLogin} />
+          {/* <Stack.Screen name="Landing" component={Landing} /> */}
+            <Stack.Screen name="Landing" component={Landing} />{/* remove */}
+            <Stack.Screen name="Login" component={Login} />
             <Stack.Screen
               name="ForgotPasswordEmail"
               component={ForgotPasswordEmail}

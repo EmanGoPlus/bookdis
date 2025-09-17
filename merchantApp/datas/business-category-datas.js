@@ -15,7 +15,7 @@ export const BUSINESS_CATEGORIES = {
   
   sub: {
     retail: [
-      { label: "← Back to Categories", value: "back" },
+      // { label: "← Back to Categories", value: "back" },
       { label: "Clothing & Apparel", value: "clothing" },
       { label: "Electronics", value: "electronics" },
       { label: "Grocery / Supermarket", value: "grocery" },
@@ -27,7 +27,7 @@ export const BUSINESS_CATEGORIES = {
     ],
     
     food: [
-      { label: "← Back to Categories", value: "back" },
+      // { label: "← Back to Categories", value: "back" },
       { label: "Restaurant", value: "restaurant" },
       { label: "Cafe / Coffee Shop", value: "cafe" },
       { label: "Bakery / Pastry Shop", value: "bakery" },
@@ -38,7 +38,7 @@ export const BUSINESS_CATEGORIES = {
     ],
     
     services: [
-      { label: "← Back to Categories", value: "back" },
+      // { label: "← Back to Categories", value: "back" },
       { label: "Hair & Beauty Salon", value: "salon" },
       { label: "Spa / Wellness", value: "spa" },
       { label: "Cleaning Services", value: "cleaning" },
@@ -50,7 +50,7 @@ export const BUSINESS_CATEGORIES = {
     ],
     
     health: [
-      { label: "← Back to Categories", value: "back" },
+      // { label: "← Back to Categories", value: "back" },
       { label: "Hospital / Clinic", value: "hospital" },
       { label: "Pharmacy", value: "pharmacy" },
       { label: "Dental Clinic", value: "dental" },
@@ -60,7 +60,7 @@ export const BUSINESS_CATEGORIES = {
     ],
     
     tech: [
-      { label: "← Back to Categories", value: "back" },
+      // { label: "← Back to Categories", value: "back" },
       { label: "Software Development", value: "software" },
       { label: "IT Support / Services", value: "itsupport" },
       { label: "Web Development", value: "webdev" },
@@ -70,7 +70,7 @@ export const BUSINESS_CATEGORIES = {
     ],
     
     pro: [
-      { label: "← Back to Categories", value: "back" },
+      // { label: "← Back to Categories", value: "back" },
       { label: "Legal Services", value: "legal" },
       { label: "Accounting / Finance", value: "accounting" },
       { label: "Real Estate Agent", value: "realestateagent" },
@@ -82,7 +82,7 @@ export const BUSINESS_CATEGORIES = {
     ],
     
     transport: [
-      { label: "← Back to Categories", value: "back" },
+      // { label: "← Back to Categories", value: "back" },
       { label: "Taxi / Ride Service", value: "taxi" },
       { label: "Delivery Service", value: "delivery" },
       { label: "Moving Service", value: "moving" },
@@ -93,7 +93,7 @@ export const BUSINESS_CATEGORIES = {
     ],
     
     realestate: [
-      { label: "← Back to Categories", value: "back" },
+      // { label: "← Back to Categories", value: "back" },
       { label: "Residential Sales", value: "residentialsales" },
       { label: "Commercial Sales", value: "commercialsales" },
       { label: "Property Rental", value: "propertyrental" },
@@ -103,7 +103,7 @@ export const BUSINESS_CATEGORIES = {
     ],
     
     arts: [
-      { label: "← Back to Categories", value: "back" },
+      // { label: "← Back to Categories", value: "back" },
       { label: "Art Gallery", value: "gallery" },
       { label: "Music / Performance", value: "music" },
       { label: "Theater / Cinema", value: "theater" },

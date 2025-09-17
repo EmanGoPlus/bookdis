@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useContext } from "react";
 import {
-  SafeAreaView,
   Text,
   StyleSheet,
   StatusBar,
   TouchableOpacity,
   View,
+  Image,
+  Platform,
 } from "react-native";
 
 import axios from "axios";
@@ -15,20 +16,15 @@ import { useFonts } from "expo-font";
 import { Picker } from "@react-native-picker/picker";
 import { API_BASE_URL } from "../apiConfig";
 import { UserContext } from "../context/AuthContext";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { GlobalStyles, Colors, Fonts } from "../styles/globalStyles";
 
 export default function Home({ navigation }) {
   const [businesses, setBusinesses] = useState([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState("");
   const { user, selectBusiness, isMerchant, logout } = useContext(UserContext);
 
-  const [fontsLoaded] = useFonts({
-    "HessGothic-Bold": require("../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
-  });
-
-  // if (!fontsLoaded) return null;
-
   useEffect(() => {
-
     if (!isMerchant()) {
       console.log("⚠️ Non-merchant user redirected from Home");
       navigation.navigate("Default");
@@ -121,7 +117,7 @@ export default function Home({ navigation }) {
 
   return (
     <LinearGradient
-      colors={["#ffce54", "#fda610", "#f75c3c"]}
+      colors={["#C0CAFE", "#fff"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.background}
@@ -132,22 +128,22 @@ export default function Home({ navigation }) {
         backgroundColor="transparent"
       />
       <SafeAreaView style={styles.container}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerText}>Welcome to</Text>
-          <Text style={styles.headerText}>Bookdis</Text>
-          {user && (
-            <Text style={styles.userGreeting}>
-              Hello, {user.firstName || user.phone}!
-            </Text>
-          )}
-        </View>
+        <Image
+          style={styles.image}
+          source={require("../assets/bookdis-final-logo.png")}
+        />
+        {user && (
+          <Text style={styles.userGreeting}>
+            Hello, {user.firstName || user.phone}!
+          </Text>
+        )}
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={styles.button}
+            style={GlobalStyles.button}
             onPress={() => navigation.navigate("CreateBusiness")}
           >
-            <Text style={styles.buttonText}>Add Business</Text>
+            <Text style={GlobalStyles.buttonText}>Add Business</Text>
           </TouchableOpacity>
 
           <View style={styles.card}>
@@ -157,7 +153,7 @@ export default function Home({ navigation }) {
                 selectedValue={selectedBusinessId}
                 onValueChange={handleBusinessSelection}
                 style={styles.picker}
-                dropdownIconColor="#666"
+                dropdownIconColor={Colors.textGrey}
               >
                 <Picker.Item label="-- Choose Business --" value="" />
                 {businesses.map((biz) => (
@@ -176,18 +172,18 @@ export default function Home({ navigation }) {
             )}
           </View>
 
-                    <TouchableOpacity
-            style={styles.button}
+          <TouchableOpacity
+            style={GlobalStyles.button}
             onPress={() => navigation.navigate("AddEmployee")}
           >
-            <Text style={styles.buttonText}>Add Employee</Text>
+            <Text style={GlobalStyles.buttonText}>Add Employee</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.button, styles.logout]}
+            style={[GlobalStyles.button, styles.logout]}
             onPress={handleLogout}
           >
-            <Text style={[styles.text, styles.logoutText]}>Logout</Text>
+            <Text style={[GlobalStyles.buttonText, styles.logoutText]}>Logout</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -201,11 +197,15 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 24,
-  },
-  headerContainer: {
+    justifyContent: "center",
     alignItems: "center",
-    marginTop: 80,
+    paddingHorizontal: 20,
+  },
+  image: {
+    width: 200,
+    height: 200,
+    resizeMode: "contain",
+    marginBottom: -40,
   },
   buttonContainer: {
     flex: 1,
@@ -214,53 +214,25 @@ const styles = StyleSheet.create({
     marginBottom: 120,
     gap: 20,
   },
-  headerText: {
-    fontSize: 48,
-    color: "#fff",
-    fontFamily: "HessGothic-Bold",
-    textShadowColor: "rgba(0,0,0,0.15)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
   userGreeting: {
     fontSize: 16,
-    color: "#fff",
+    color: Colors.white,
     marginTop: 10,
     opacity: 0.9,
   },
-  button: {
-    backgroundColor: "#fff",
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    borderRadius: 16,
-    width: "100%",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  text: {
-    fontFamily: "HessGothic-Bold",
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#f75c3c",
-  },
   logout: {
-    backgroundColor: "#f75c3c",
+    backgroundColor: Colors.secondary,
     borderWidth: 0,
   },
   logoutText: {
-    color: "#fff",
+    color: Colors.white,
   },
-
   card: {
-    backgroundColor: "rgba(255,255,255,0.98)",
+    backgroundColor: Colors.cardBackground,
     borderRadius: 20,
     padding: 24,
     width: "100%",
-    shadowColor: "#000",
+    shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
@@ -274,10 +246,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   pickerContainer: {
-    backgroundColor: "#f8f9fa",
+    backgroundColor: Colors.pickerBackground,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#e9ecef",
+    borderColor: Colors.pickerBorder,
     overflow: "hidden",
   },
   picker: {
@@ -286,7 +258,7 @@ const styles = StyleSheet.create({
   },
   noBusiness: {
     textAlign: "center",
-    color: "#666",
+    color: Colors.textGrey,
     fontStyle: "italic",
     marginTop: 10,
   },

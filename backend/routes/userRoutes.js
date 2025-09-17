@@ -19,6 +19,8 @@ async function userRoutes(fastify, options) {
 
   fastify.post("/employee-login", userController.employeeLogin);
 
+  fastify.post("/login", userController.combinedLogin);
+
   fastify.post("/register", userController.merchantRegister); //fix next week
 
   fastify.post("/employee-register", userController.employeeRegister);

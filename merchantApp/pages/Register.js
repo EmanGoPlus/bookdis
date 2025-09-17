@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  SafeAreaView,
   Text,
   StyleSheet,
   StatusBar,
@@ -14,12 +13,18 @@ import {
   Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useFonts } from "expo-font";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import ErrorModal from "../components/errorModal";
 import SuccessModal from "../components/successModal";
 import { API_BASE_URL } from "../apiConfig";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Path, Circle } from "react-native-svg";
+import {
+  useFonts,
+  Roboto_800ExtraBold,
+  Roboto_400Regular,
+} from "@expo-google-fonts/roboto";
 
 export default function Register({ navigation }) {
   const [checked, setChecked] = useState(false);
@@ -39,9 +44,9 @@ export default function Register({ navigation }) {
     confirmPassword: "",
     role: "merchant",
   });
-
   const [fontsLoaded] = useFonts({
-    "HessGothic-Bold": require("../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
+    Roboto_800ExtraBold,
+    Roboto_400Regular,
   });
 
   if (!fontsLoaded) return null;
@@ -85,7 +90,15 @@ export default function Register({ navigation }) {
 
   const handleSignup = async () => {
     try {
-      const { firstName, lastName, email, phone, password, confirmPassword, role } = formData;
+      const {
+        firstName,
+        lastName,
+        email,
+        phone,
+        password,
+        confirmPassword,
+        role,
+      } = formData;
 
       if (!firstName || !lastName || !email || !phone || !password) {
         setError("Please fill in all required fields");
@@ -160,7 +173,8 @@ export default function Register({ navigation }) {
 
   return (
     <LinearGradient
-      colors={["#ffce54", "#fda610", "#f75c3c"]}
+      colors={["#C0CAFE", "#fff"]}
+      locations={[0, 0.7]} // 70% transition, last 30% is solid white
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.background}
@@ -182,60 +196,89 @@ export default function Register({ navigation }) {
           bounces={false}
         >
           <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-              <Image
-                style={styles.image}
-                source={require("../assets/bookdis-logo.png")}
-              />
-              <Text style={styles.title}>Sign Up</Text>
+            <TouchableOpacity style={styles.back} onPress={() => navigation.navigate("Login")}>
+              <Svg width={15} height={44} viewBox="0 0 15 44" fill="none">
+                <Path
+                  d="M13.2656 10L1.73438 21.5312L13.2656 33.0625"
+                  stroke="#672BBA"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+
+            <Text style={styles.title}>Create Account</Text>
+
+            <View style={styles.signIn}>
+              <Text style={styles.signInText}>Already have an Acount? </Text>
+              <TouchableOpacity>
+                <Text
+                  style={styles.signInLink}
+                  onPress={() => navigation.navigate("Login")}
+                >
+                  Sign in
+                </Text>
+              </TouchableOpacity>
             </View>
-
             <View style={styles.form}>
-              <Text style={styles.label}>First Name</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.firstName}
-                onChangeText={(value) => handleInputChange("firstName", value)}
-                keyboardType="default"
-                returnKeyType="next"
-                autoCapitalize="words"
-              />
-
-              <Text style={styles.label}>Last Name</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.lastName}
-                onChangeText={(value) => handleInputChange("lastName", value)}
-                keyboardType="default"
-                returnKeyType="next"
-                autoCapitalize="words"
-              />
-
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.email}
-                onChangeText={(value) => handleInputChange("email", value)}
-                keyboardType="email-address"
-                returnKeyType="next"
-                autoCapitalize="none"
-              />
-
-              <Text style={styles.label}>Phone</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.phone}
-                onChangeText={(value) => handleInputChange("phone", value)}
-                keyboardType="phone-pad"
-                returnKeyType="next"
-              />
-
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.passwordContainer}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>First Name</Text>
                 <TextInput
-                  style={styles.passwordInput}
+                  style={styles.input}
+                  value={formData.firstName}
+                  onChangeText={(value) =>
+                    handleInputChange("firstName", value)
+                  }
+                  keyboardType="default"
+                  returnKeyType="next"
+                  autoCapitalize="words"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Last Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.lastName}
+                  onChangeText={(value) => handleInputChange("lastName", value)}
+                  keyboardType="default"
+                  returnKeyType="next"
+                  autoCapitalize="words"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.email}
+                  onChangeText={(value) => handleInputChange("email", value)}
+                  keyboardType="email-address"
+                  returnKeyType="next"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Phone</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.phone}
+                  onChangeText={(value) => handleInputChange("phone", value)}
+                  keyboardType="phone-pad"
+                  returnKeyType="next"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                  style={[styles.input, { paddingRight: 40 }]} // give space for eye icon
                   value={formData.password}
-                  onChangeText={(value) => handleInputChange("password", value)}
+                  onChangeText={(value) =>
+                    handleInputChange("password", value)
+                  }
                   secureTextEntry={!showPassword}
                   returnKeyType="next"
                 />
@@ -251,17 +294,16 @@ export default function Register({ navigation }) {
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.label}>Re-enter Password</Text>
-              <View style={styles.passwordContainer}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Confirm Password</Text>
                 <TextInput
-                  style={styles.passwordInput}
+                  style={[styles.input, { paddingRight: 40 }]} // give space for eye icon
                   value={formData.confirmPassword}
                   onChangeText={(value) =>
                     handleInputChange("confirmPassword", value)
                   }
                   secureTextEntry={!showConfirmPassword}
-                  returnKeyType="done"
-                  onSubmitEditing={handleSignup}
+                  returnKeyType="next"
                 />
                 <TouchableOpacity
                   onPress={() => setConfirmShowPassword(!showConfirmPassword)}
@@ -284,28 +326,36 @@ export default function Register({ navigation }) {
                   {checked && <Text style={styles.checkmark}>✓</Text>}
                 </View>
                 <View style={styles.termsTextContainer}>
-                  <Text style={styles.checkboxLabel}>I agree to the </Text>
+            
                   <TouchableOpacity onPress={() => setShowTermsModal(true)}>
-                    <Text style={styles.seeMoreText}>Terms & Conditions</Text>
+                    <Text style={styles.seeMoreText}>Terms and Agreements</Text>
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.button, !checked && styles.disabledButton]}
-                onPress={checked ? handleSignup : null}
-                activeOpacity={checked ? 0.8 : 1}
-                disabled={!checked}
-              >
-                <Text
-                  style={[
-                    styles.buttonText,
-                    !checked && styles.disabledButtonText,
-                  ]}
-                >
-                  Sign up
-                </Text>
-              </TouchableOpacity>
+<TouchableOpacity
+  style={[styles.buttonWrapper, !checked && styles.disabledButton]}
+  onPress={checked ? handleSignup : null}
+  activeOpacity={checked ? 0.8 : 1}
+  disabled={!checked}
+>
+  <LinearGradient
+    colors={["#5C0AE4", "#6A13D8"]}
+    style={styles.button}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+  >
+    <Text
+      style={[
+        styles.buttonText,
+        !checked && styles.disabledButtonText,
+      ]}
+    >
+      Sign up
+    </Text>
+  </LinearGradient>
+</TouchableOpacity>
+
             </View>
           </SafeAreaView>
         </ScrollView>
@@ -431,83 +481,84 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
 
-  container: {
+    container: {
     flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 20 : 20,
   },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "80%",
-    marginBottom: 10,
-    marginTop: 30,
-  },
-
-  image: {
-    width: 70,
-    height: 70,
-    resizeMode: "contain",
+  back: {
+    paddingHorizontal: 20,
   },
 
   title: {
-    fontSize: 30,
-    color: "#fff",
-    fontFamily: "HessGothic-Bold",
-    marginLeft: 15,
+    fontSize: 35,
+    color: "#380F7E",
+    fontFamily: "Roboto_800ExtraBold",
+    paddingHorizontal: 20,
+  },
+
+  signIn: {
+    flexDirection: "row",
+    marginBottom: 10,
+    paddingHorizontal: 20,
+  },
+
+  signInText: {
+    fontSize: 16,
+    fontFamily: "Roboto_800Regular",
+    color: "#000",
+  },
+
+  signInLink: {
+    fontSize: 16,
+    fontFamily: "Roboto_800Regular",
+    color: "#B00AFD",
+    textDecorationLine: "underline",
   },
 
   form: {
-    width: "80%",
+    marginTop: 30,
+    width: "100%",
+    maxWidth: 400,
     alignItems: "center",
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+
+  inputContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#4B1AA9",
+    marginBottom: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: "100%",
+    height: 70,
+    position: "relative",
   },
 
   label: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-    alignSelf: "flex-start",
-    marginBottom: 5,
-    marginTop: 15,
+    position: "absolute",
+    top: 8,
+    left: 16,
+    fontSize: 12,
+    color: "#999",
+    zIndex: 1,
   },
 
   input: {
-    height: 35, // slightly smaller
-    borderWidth: 1,
-    borderColor: "transparent",
-    paddingHorizontal: 12, // left/right padding
-    paddingVertical: 6, // smaller vertical padding
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    width: "100%",
     fontSize: 16,
-    textAlignVertical: "center", // important for Android
-  },
-
-  passwordContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-
-  passwordInput: {
-    flex: 1,
-    height: 35,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    fontSize: 16,
-    textAlignVertical: "center",
+    color: "#000",
+    height: "100%",
+    paddingTop: 16,
   },
 
   eyeButton: {
+    position: 'absolute',
+    right: 16,
+    top: '50%',
+    transform: [{ translateY: -10 }], // Center the icon vertically
     padding: 10,
     justifyContent: "center",
     alignItems: "center",
@@ -517,25 +568,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    marginTop: 20,
+    marginTop: 5,
     marginBottom: 10,
   },
 
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 21,
+    height: 21,
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: "#B13BFF",
     backgroundColor: "transparent",
-    borderRadius: 4,
+    borderRadius: 5,
+    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
   },
 
   checkedBox: {
-    backgroundColor: "#fff",
-    borderColor: "#fff",
+ width: 21,
+    height: 21,
+    borderWidth: 2,
+    borderColor: "#B13BFF",
+    backgroundColor: "transparent",
+    borderRadius: 5,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
   },
 
   checkmark: {
@@ -557,41 +617,45 @@ const styles = StyleSheet.create({
   },
 
   seeMoreText: {
-    color: "#FFD882",
+    color: "#303030",
     fontSize: 14,
     fontWeight: "600",
     textDecorationLine: "underline",
   },
 
-  button: {
-    backgroundColor: "#FFD882",
-    paddingVertical: 15,
-    borderRadius: 8,
-    marginTop: 10,
-    marginBottom: 40,
-    width: "100%",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+ buttonWrapper: {
+  borderRadius: 8,
+  overflow: "hidden", // ensures gradient respects border radius
+  marginTop: 10,
+  marginBottom: 40,
+  width: "100%",
+  elevation: 3,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+},
+button: {
+  paddingVertical: 15,
+  alignItems: "center",
+  borderRadius: 8,
+},
+
 
   buttonText: {
-    fontFamily: "HessGothic-Bold",
+    fontFamily: "Roboto_800Regular",
     fontSize: 16,
-    color: "#000",
-    fontWeight: "600",
+    color: "#fff",
+    fontWeight: "500",
   },
 
   disabledButton: {
-    backgroundColor: "#cccccc",
-    opacity: 0.6,
+    backgroundColor: "#fff",
+    opacity: 0.4,
   },
 
   disabledButtonText: {
-    color: "#666666",
+    color: "#fff",
   },
 
   // Terms Modal Styles

@@ -36,6 +36,92 @@ const userController = {
     }
   },
 
+  async combinedLogin(request, reply) {
+  try {
+    const { username, password } = request.body; // Keep 'username' as the field name for consistency with your UI
+
+    if (!username || !password) {
+      return reply.status(400).send({ error: "Please enter both username/phone and password" });
+    }
+
+    const loginResult = await userModel.combinedLogin(username, password);
+
+    if (!loginResult) {
+      return reply.status(401).send({ error: "Invalid credentials" });
+    }
+
+    const { user, type } = loginResult;
+
+    // Create JWT token
+    const tokenPayload = {
+      id: user.id,
+      role: user.role || type, // Use role if available, otherwise use type
+    };
+
+    // Add businessId for employees
+    if (type === 'employee' && user.businessId) {
+      tokenPayload.businessId = user.businessId;
+    }
+
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+    // Prepare response based on user type
+    let response = {
+      message: "Login successful",
+      token,
+      userType: type
+    };
+
+    if (type === 'employee') {
+      response.user = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        username: user.username,
+        role: user.role,
+        businessId: user.businessId,
+      };
+
+      // Fetch business data if businessId exists
+      if (user.businessId) {
+        try {
+          const businessResult = await db
+            .select()
+            .from(businesses) // Assuming you have a businesses table
+            .where(eq(businesses.id, user.businessId));
+          
+          if (businessResult[0]) {
+            response.business = businessResult[0];
+          }
+        } catch (businessError) {
+          console.error('Failed to fetch business data:', businessError);
+          // Continue without business data
+        }
+      }
+    } else if (type === 'merchant') {
+      response.user = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        role: user.role,
+      };
+
+      // For merchants, you might want to fetch their business data differently
+      // Add business fetching logic here if needed
+    }
+
+    return reply.send(response);
+
+  } catch (err) {
+    console.error("Error in combined login:", err);
+    reply
+      .status(500)
+      .send({ error: "Failed to login", details: err.message });
+  }
+},
+
   async merchantLogin(request, reply) {
     try {
       const { phone, password } = request.body;

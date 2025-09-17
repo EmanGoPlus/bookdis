@@ -5,7 +5,6 @@ import { eq, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 const userModel = {
-
   async getUserByPhone(phone) {
     const result = await db
       .select()
@@ -15,8 +14,55 @@ const userModel = {
     return result[0] || null;
   },
 
-  async employeeLogin(username, password) {
+  async combinedLogin(identifier, password) {
+    // First try employee login (username-based)
+    try {
+      const employeeResult = await db
+        .select()
+        .from(employees)
+        .where(eq(employees.username, identifier));
 
+      const employee = employeeResult[0];
+
+      if (employee) {
+        const isValidPassword = await bcrypt.compare(
+          password,
+          employee.password
+        );
+        if (isValidPassword) {
+          return { user: employee, type: "employee" };
+        }
+      }
+    } catch (error) {
+      console.error("Employee login attempt failed:", error);
+    }
+
+    // If employee login fails, try merchant login (phone-based)
+    try {
+      const merchantResult = await db
+        .select()
+        .from(merchants)
+        .where(eq(merchants.phone, identifier));
+
+      const merchant = merchantResult[0];
+
+      if (merchant) {
+        const isValidPassword = await bcrypt.compare(
+          password,
+          merchant.password
+        );
+        if (isValidPassword) {
+          return { user: merchant, type: "merchant" };
+        }
+      }
+    } catch (error) {
+      console.error("Merchant login attempt failed:", error);
+    }
+
+    return null;
+  },
+
+  async employeeLogin(username, password) {
     const result = await db
       .select()
       .from(employees)
@@ -47,29 +93,37 @@ const userModel = {
     return result[0] || null;
   },
 
-  async merchantRegister(firstName, lastName, password, email, phone, role = "merchant") {
-  const hashedPassword = await bcrypt.hash(password, 10);
-  
-  const result = await db.insert(merchants)
-    .values({
-      firstName,
-      lastName,
-      password: hashedPassword, // store hashed
-      email,
-      phone,
-      role,
-    })
-    .returning({
-      id: merchants.id,
-      firstName: merchants.firstName,
-      lastName: merchants.lastName,
-      email: merchants.email,
-      phone: merchants.phone,
-      role: merchants.role,
-    });
+  async merchantRegister(
+    firstName,
+    lastName,
+    password,
+    email,
+    phone,
+    role = "merchant"
+  ) {
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  return result[0];
-},
+    const result = await db
+      .insert(merchants)
+      .values({
+        firstName,
+        lastName,
+        password: hashedPassword, // store hashed
+        email,
+        phone,
+        role,
+      })
+      .returning({
+        id: merchants.id,
+        firstName: merchants.firstName,
+        lastName: merchants.lastName,
+        email: merchants.email,
+        phone: merchants.phone,
+        role: merchants.role,
+      });
+
+    return result[0];
+  },
 
   async addEmployee(
     firstName,

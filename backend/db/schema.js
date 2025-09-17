@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, integer, boolean, timestamp, text } from "drizzle-orm/pg-core";
 
 // ----------------------
 // Merchants (owners)
@@ -8,8 +8,8 @@ export const merchants = pgTable("tbl_merchants", {
   firstName: varchar("first_name", { length: 50 }),
   lastName: varchar("last_name", { length: 50 }),
   password: varchar("password").notNull(),
-  email: varchar("email", { length: 100 }).notNull().unique(),
-  phone: varchar("phone", { length: 11 }).unique(),
+  email: varchar("email", { length: 100 }).notNull(),
+  phone: varchar("phone", { length: 11 }).unique().notNull(),
   role: varchar("role", { length: 50 }).default("merchant"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -74,6 +74,7 @@ export const businesses = pgTable("tbl_businesses", {
 // ----------------------
 // Business Documents
 // ----------------------
+
 export const businessDocuments = pgTable("tbl_business_documents", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").references(() => businesses.id).notNull(),
@@ -112,6 +113,7 @@ export const elements = pgTable("tbl_elements", {
 // ----------------------
 // Credit Transactions
 // ----------------------
+
 export const creditTransactions = pgTable("tbl_credit_transactions", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").references(() => businesses.id).notNull(),
@@ -143,16 +145,15 @@ export const products = pgTable("tbl_products", {
   businessId: integer("business_id").references(() => businesses.id).notNull(),
 
   // Basic info
-  name: varchar("name", { length: 100 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
   description: text("description"), // longer text
-  category: varchar("category", { length: 50 }), // optional category
-  price: integer("price").notNull(), // stored in centavos or smallest currency unit
+  category: varchar("category", { length: 50 }),
+  price: integer("price").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
 
-  // Optional image
+
   imageUrl: varchar("image_url", { length: 255 }),
 
-  // Stock / inventory (optional)
   stock: integer("stock").default(0),
 
   createdAt: timestamp("created_at").defaultNow(),
