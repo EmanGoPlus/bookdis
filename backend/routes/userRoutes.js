@@ -2,7 +2,7 @@ import userController from "../controllers/userController.js";
 import businessController from "../controllers/businessController.js";
 import creditController from "../controllers/creditController.js";
 import permissionController from "../controllers/permissionController.js";
-
+import promoController from "../controllers/promoController.js";
 import authenticateToken from "../middlewares/auth.js";
 import fastifyMultipart from "@fastify/multipart";
 
@@ -21,9 +21,11 @@ async function userRoutes(fastify, options) {
 
   fastify.post("/login", userController.combinedLogin);
 
-  fastify.post("/register", userController.merchantRegister); //fix next week
+  fastify.post("/register", userController.merchantRegister); //fix the name next week
 
   fastify.post("/employee-register", userController.employeeRegister);
+
+  fastify.post("/customer-login", userController.customerLogin);
 
   //=============================BUSINESS=============================
 
@@ -49,7 +51,8 @@ async function userRoutes(fastify, options) {
     handler: businessController.getDocuments,
   });
 
-  fastify.get( //used by employee and merchant
+  fastify.get(
+    //used by employee and merchant
     "/business/:businessId",
     { preHandler: authenticateToken },
     businessController.getBusinessById
@@ -76,6 +79,12 @@ async function userRoutes(fastify, options) {
   fastify.get("/business/:id/credits-history", {
     preHandler: authenticateToken,
     handler: creditController.getHistory,
+  });
+
+  //=============================PROMOS=============================
+  fastify.post("/business/create-promo", {
+    preHandler: authenticateToken,
+    handler: promoController.createPromo,
   });
 }
 

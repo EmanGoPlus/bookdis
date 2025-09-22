@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import {
   useFonts,
   Roboto_800ExtraBold,
+  Roboto_600SemiBold,
   Roboto_400Regular,
 } from "@expo-google-fonts/roboto";
 import { API_BASE_URL } from "../../apiConfig";
@@ -27,6 +28,11 @@ export default function Home({ navigation }) {
   const [selectedBusiness, setSelectedBusiness] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const { user, selectBusiness, isMerchant, logout } = useContext(UserContext);
+  const [fontsLoaded] = useFonts({
+      Roboto_800ExtraBold,
+      Roboto_600SemiBold,
+      Roboto_400Regular,
+    });
 
   useEffect(() => {
     if (!isMerchant()) {
@@ -123,10 +129,11 @@ export default function Home({ navigation }) {
     </TouchableOpacity>
   );
 
+      if (!fontsLoaded) return null;
+
   return (
     <LinearGradient
-      colors={["#C0CAFE", "#fff"]}
-      locations={[0, 0.7]} // 70% transition, last 30% is solid white
+      colors={["#23143C", "#4F0CBD", "#6D08B1"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.background}
@@ -154,28 +161,29 @@ export default function Home({ navigation }) {
             onPress={() => navigation.navigate("CreateBusiness")}
           >
             <LinearGradient
-              colors={["#5C0AE4", "#6A13D8"]}
-                  start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+              colors={["#FFFFFF", "#FFFFFF"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.button}
             >
               <Text style={styles.buttonText}>Add Business</Text>
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.selectButton]}
-            onPress={() => setModalVisible(true)}
-            disabled={businesses.length === 0}
-          >
-            <Text style={styles.selectButtonText}>
-              {selectedBusiness
-                ? `Selected: ${selectedBusiness.businessName}`
-                : businesses.length > 0
-                  ? "Select Business"
-                  : "No Businesses Available"}
-            </Text>
-          </TouchableOpacity>
+<TouchableOpacity
+  style={styles.selectButton}
+  onPress={() => setModalVisible(true)}
+  disabled={businesses.length === 0}
+>
+  <Text style={styles.selectButtonText}>
+    {selectedBusiness
+      ? `Selected: ${selectedBusiness.businessName}`
+      : businesses.length > 0
+      ? "Select Business"
+      : "No Businesses Available"}
+  </Text>
+</TouchableOpacity>
+
 
           {businesses.length === 0 && (
             <Text style={styles.noBusiness}>
@@ -230,6 +238,21 @@ export default function Home({ navigation }) {
           >
             <Text style={styles.buttonText}>Logout</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.logoutButton]}
+            onPress={() => navigation.navigate("Verification")} // ✅ CORRECT - calls on press
+          >
+            <Text style={styles.buttonText}>Verification temporary button</Text>
+          </TouchableOpacity>
+
+                    <TouchableOpacity
+            style={[styles.button, styles.logoutButton]}
+            onPress={() => navigation.navigate("AddPromo")}
+          >
+            <Text style={styles.buttonText}>add promo</Text>
+          </TouchableOpacity>
+          
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -266,36 +289,58 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 8,
   },
-button: {
-  paddingVertical: 18,
+
+    buttonWrapper: {
+    borderRadius: 15,
+    overflow: "hidden", // ensures gradient respects border radius
+    marginTop: 10,
+    marginBottom: 40,
+    width: "100%",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  button: {
+  height: 65,
+  justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 15,
+  },
+
+// gradientBorderContainer: {
+//   borderRadius: 15,
+//   padding: 1,
+//   width: "100%",
+//   height: 65,
+//   justifyContent: "center", // centers inner button
+// },
+
+selectButton: {
+  width: "100%",
+  height: 65,
   borderRadius: 15,
-  width: "100%",   // ✅ stays here for the gradient
+  borderWidth: 1,
+  borderColor: '#8D4BFF',
   alignItems: "center",
+  justifyContent: "center",
+  marginTop: 8,
+
 },
 
-  selectButton: {
-    marginTop: 7,
-    borderWidth: 1,
-    borderColor: "#4B1AA9",
-    paddingVertical: 18,
-    borderRadius: 15,
-    width: "100%",
-    alignItems: "center",
-    
-  },
   logoutButton: {
     backgroundColor: "#f75c3c",
   },
   buttonText: {
-    fontFamily: "Roboto_800ExtraBold",
+    fontFamily: "Roboto_600SemiBold",
     fontSize: 16,
-    color: "#fff",
-    fontWeight: "700",
+    color: "#702BC7",
   },
   selectButtonText: {
-    fontFamily: "Roboto_400Regular",
+    fontFamily: "Roboto_600SemiBold",
     fontSize: 16,
-    color: "#4B1AA9",
+    color: "#FFFFFF",
   },
   noBusiness: {
     textAlign: "center",
@@ -354,8 +399,8 @@ button: {
     color: "#007AFF",
     marginTop: 7,
     fontSize: 15,
-    fontWeight: "500",
-    color: "#B00AFD",
+    fontFamily: "Roboto_400Regular",
+    color: "#4EB8FA",
     textDecorationLine: "underline",
   },
 });

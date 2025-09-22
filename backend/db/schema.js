@@ -8,7 +8,7 @@ export const merchants = pgTable("tbl_merchants", {
   firstName: varchar("first_name", { length: 50 }),
   lastName: varchar("last_name", { length: 50 }),
   password: varchar("password").notNull(),
-  email: varchar("email", { length: 100 }).notNull(),
+  email: varchar("email", { length: 100 }).unique().notNull(),
   phone: varchar("phone", { length: 11 }).unique().notNull(),
   role: varchar("role", { length: 50 }).default("merchant"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -28,6 +28,30 @@ export const employees = pgTable("tbl_employees", {
   businessId: integer("business_id").references(() => businesses.id).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ----------------------
+// Customers
+// ----------------------
+
+export const customers = pgTable("tbl_customers", {
+  id: serial("id").primaryKey(),
+  firstName: varchar("first_name", { length: 50 }),
+  lastName: varchar("last_name", { length: 50 }),
+  email: varchar("email", { length: 100 }).unique().notNull(),
+  phone: varchar("phone", { length: 11 }).unique().notNull(),
+  password: varchar("password").notNull(),
+  role: varchar("role", { length: 50 }).default("customer"),
+  createdAt: timestamp("created_at").defaultNow()
+});
+
+export const customerMemberships = pgTable("tbl_customer_memberships", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  businessId: integer("business_id").references(() => businesses.id).notNull(),
+  membershipLevel: varchar("membership_level", { length: 50 }), // regular, gold, vip
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // ----------------------
@@ -158,5 +182,60 @@ export const products = pgTable("tbl_products", {
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+
+// ----------------------
+// Promos
+// ----------------------
+
+export const promos = pgTable("tbl_promos", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").references(() => businesses.id).notNull(),
+
+  // display
+  title: varchar("title", { length: 100 }).notNull(),
+  description: varchar("description", { length: 255 }),
+
+  // discount mechanics
+  discountType: varchar("discount_type", { length: 50 }).notNull(),
+  discountValue: integer("discount_value"),
+  conditions: text("conditions"),
+
+  // validity
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  validDays: varchar("valid_days", { length: 50 }),
+
+  // usage control
+  maxRedemptions: integer("max_redemptions"),
+  maxRedemptionsPerUser: integer("max_redemptions_per_user"),
+  cooldownHours: integer("cooldown_hours"),
+
+  // NEW: eligibility
+  eligibleMemberships: varchar("eligible_memberships", { length: 255 }), 
+  // e.g. "regular,gold,vip" or null = open to all
+
+  // status
+  isActive: boolean("is_active").default(true),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const claimedPromos = pgTable("tbl_claimed_promos", {
+  id: serial("id").primaryKey(),
+  promoId: integer("promo_id").references(() => promos.id).notNull(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+
+  // QR & usage tracking
+  qrCode: varchar("qr_code", { length: 255 }).notNull(),
+  redeemedAt: timestamp("redeemed_at"),
+  isRedeemed: boolean("is_redeemed").default(false),
+
+  // NEW: track membership at claim time
+  membershipLevel: varchar("membership_level", { length: 50 }),
+
+  createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -8,9 +8,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // Screens
 import Landing from "./pages/Public/Landing"
 import Login from "./pages/Public/Login";
-import ForgotPasswordEmail from "./pages/ForgotPasswordEmail";
-import ForgotPasswordNumber from "./pages/ForgotPasswordNumber";
-import Register from "./pages/Register";
+import ForgotPasswordEmail from "./pages/Public/ForgotPasswordEmail";
+import ForgotPasswordNumber from "./pages/Public/ForgotPasswordNumber";
+import Register from "./pages/Public/Register";
 import Home from "./pages/Account/Home";
 import CreateBusiness from "./pages/Account/CreateBusiness";
 import Verification from "./pages/Verification";
@@ -19,6 +19,10 @@ import Dashboard from "./pages/Dashboard/Dashboard";
 import Credits from "./pages/Dashboard/Credits";
 import AddEmployee from "./pages/Account/AddEmployee";
 import Default from "./pages/default";
+
+//to delete
+
+import AddPromo from "./pages/addpromo"
 
 const Stack = createNativeStackNavigator();
 
@@ -77,6 +81,7 @@ function AppNavigator() {
           // Merchant Flow - Home first, then other screens
           <>
             <Stack.Screen name="Home" component={Home} />
+            <Stack.Screen name="AddPromo" component={AddPromo} />
             <Stack.Screen name="Dashboard" component={Dashboard} />
             <Stack.Screen name="CreateBusiness" component={CreateBusiness} />
             <Stack.Screen name="Verification" component={Verification} />

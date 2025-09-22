@@ -1,6 +1,6 @@
 import { GelBigInt64 } from "drizzle-orm/gel-core";
 import db from "../db/config.js";
-import { merchants, employees } from "../db/schema.js";
+import { merchants, employees, customers } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
@@ -89,6 +89,15 @@ const userModel = {
       .select()
       .from(merchants)
       .where(and(eq(merchants.phone, phone), eq(merchants.password, password)));
+
+    return result[0] || null;
+  },
+
+  async customerLogin(phone, password) {
+    const result = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.phone, phone), eq(customers.password, password)));
 
     return result[0] || null;
   },

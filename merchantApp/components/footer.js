@@ -1,63 +1,283 @@
 import React, { useEffect } from "react";
-import { View, TouchableOpacity, Text, StyleSheet, Dimensions } from "react-native";
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Dimensions,
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { FontAwesome5, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as NavigationBar from "expo-navigation-bar";
+import Svg, { Path, G, Defs, ClipPath, Rect } from "react-native-svg";
+import { LinearGradient } from "expo-linear-gradient";
+import { Shadow } from "react-native-shadow-2";
 
 const { width } = Dimensions.get("window");
 
-export default function Footer({ style }) {
-  const navigation = useNavigation();
+// Custom SVG Icons
+const HomeIcon = ({ size = 24, color = "#fff" }) => (
+  <Svg width={size} height={size} viewBox="0 0 30 29" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M1.56891 8.74888C0.833374 10.0926 0.833374 11.7136 0.833374 14.9555V17.1104C0.833374 22.6365 0.833374 25.3998 2.4931 27.1165C4.15284 28.8333 6.82412 28.8333 12.1667 28.8333H17.8334C23.1759 28.8333 25.8473 28.8333 27.5069 27.1165C29.1667 25.3998 29.1667 22.6365 29.1667 17.1104V14.9555C29.1667 11.7136 29.1667 10.0926 28.4312 8.74888C27.6956 7.40513 26.3519 6.57114 23.6644 4.90317L20.831 3.14473C17.9901 1.38158 16.5696 0.5 15 0.5C13.4305 0.5 12.01 1.38158 9.16908 3.14473L6.33575 4.90318C3.64822 6.57114 2.30444 7.40513 1.56891 8.74888ZM10.75 22.1042C10.1632 22.1042 9.68754 22.5799 9.68754 23.1667C9.68754 23.7534 10.1632 24.2292 10.75 24.2292H19.25C19.8368 24.2292 20.3125 23.7534 20.3125 23.1667C20.3125 22.5799 19.8368 22.1042 19.25 22.1042H10.75Z"
+      fill={color}
+    />
+  </Svg>
+);
 
-  // Set Android navigation bar color to black with white icons
+const MembersIcon = ({ size = 24, color = "#fff" }) => (
+  <Svg width={size} height={size} viewBox="0 0 32 33" fill="none">
+    <G clipPath="url(#clip0_261_90)">
+      <Path
+        d="M23 8.30005C23 11.6138 20.3137 14.3 17 14.3C13.6863 14.3 11 11.6138 11 8.30005C11 4.98633 13.6863 2.30005 17 2.30005C20.3137 2.30005 23 4.98633 23 8.30005Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+      <Path
+        d="M27 23.3C27 26.6138 22.5228 29.3 17 29.3C11.4771 29.3 7 26.6138 7 23.3C7 19.9863 11.4771 17.3 17 17.3C22.5228 17.3 27 19.9863 27 23.3Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+      <Path
+        d="M8.99059 4.30005C9.3364 4.30005 9.67401 4.32824 10 4.38191C9.2058 5.55392 8.75276 6.9068 8.75276 8.3476C8.75276 9.75331 9.18402 11.0754 9.94259 12.2274C9.63443 12.2751 9.31615 12.3 8.99059 12.3C6.23436 12.3 4 10.5092 4 8.30005C4 6.09091 6.23436 4.30005 8.99059 4.30005Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+      <Path
+        d="M6 28.3C5.01155 27.0555 4.35118 25.5282 4.35118 23.7426C4.35118 22.0116 4.97178 20.5234 5.91026 19.3C2.59522 19.571 0 21.4807 0 23.7965C0 26.1339 2.64082 28.0577 6 28.3Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+      <Path
+        d="M25.2472 8.3476C25.2472 9.75331 24.8159 11.0754 24.0573 12.2274C24.3656 12.2751 24.6838 12.3 25.0094 12.3C27.7656 12.3 30 10.5092 30 8.30005C30 6.09091 27.7656 4.30005 25.0094 4.30005C24.6635 4.30005 24.326 4.32824 24 4.38191C24.7941 5.55392 25.2472 6.9068 25.2472 8.3476Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+      <Path
+        d="M28 28.3C31.3592 28.0577 34 26.1339 34 23.7965C34 21.4807 31.4047 19.571 28.0896 19.3C29.0281 20.5234 29.6488 22.0116 29.6488 23.7426C29.6488 25.5282 28.9884 27.0555 28 28.3Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+    </G>
+    <Defs>
+      <ClipPath id="clip0_261_90">
+        <Rect
+          width="32"
+          height="32"
+          fill="white"
+          transform="translate(0 0.5)"
+        />
+      </ClipPath>
+    </Defs>
+  </Svg>
+);
+
+const PromosIcon = ({ size = 24, color = "#fff" }) => (
+  <Svg width={size} height={size} viewBox="0 0 35 28" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M13.9936 0.5H21.0065C27.6184 0.5 30.9243 0.5 32.9785 2.47702C34.516 3.95698 34.9026 6.11215 34.9997 9.77187C35.0123 10.2411 34.613 10.616 34.1412 10.735C32.6363 11.1145 31.526 12.4325 31.526 14C31.526 15.5675 32.6363 16.8855 34.1412 17.265C34.613 17.3839 35.0123 17.7589 34.9997 18.2282C34.9026 21.8879 34.516 24.043 32.9785 25.5229C30.9243 27.5 27.6184 27.5 21.0065 27.5H13.9936C7.38167 27.5 4.07574 27.5 2.02169 25.5229C0.484072 24.043 0.0974791 21.8879 0.000283971 18.2282C-0.012176 17.7589 0.387122 17.3839 0.858836 17.265C2.3638 16.8855 3.47413 15.5675 3.47413 14C3.47413 12.4325 2.3638 11.1145 0.858836 10.735C0.387122 10.616 -0.012176 10.2411 0.000283971 9.77187C0.0974791 6.11215 0.484072 3.95698 2.02169 2.47702C4.07574 0.5 7.38167 0.5 13.9936 0.5ZM19.1697 10.9606L18.9973 10.663C18.3311 9.51267 17.9981 8.9375 17.5 8.9375C17.002 8.9375 16.669 9.51267 16.0027 10.663L15.8304 10.9606C15.641 11.2875 15.5463 11.4509 15.3988 11.5587C15.2511 11.6665 15.0674 11.7067 14.6997 11.7867L14.3651 11.8596C13.0713 12.1414 12.4244 12.2821 12.2705 12.7585C12.1166 13.2349 12.5576 13.7312 13.4396 14.7239L13.6678 14.9808C13.9184 15.2628 14.0438 15.4038 14.1001 15.5783C14.1565 15.7528 14.1376 15.941 14.0996 16.3174L14.0651 16.66C13.9318 17.9845 13.8651 18.6467 14.268 18.9412C14.671 19.2355 15.2767 18.9672 16.4878 18.4304L16.8013 18.2915C17.1455 18.1389 17.3177 18.0627 17.5 18.0627C17.6824 18.0627 17.8546 18.1389 18.1988 18.2915L18.5122 18.4304C19.7234 18.9672 20.3291 19.2355 20.7321 18.9412C21.135 18.6467 21.0683 17.9845 20.9349 16.66L20.9005 16.3174C20.8625 15.941 20.8436 15.7528 20.8999 15.5783C20.9563 15.4038 21.0816 15.2628 21.3324 14.9808L21.5606 14.7239C22.4424 13.7312 22.8834 13.2349 22.7296 12.7585C22.5756 12.2821 21.9288 12.1414 20.635 11.8596L20.3004 11.7867C19.9327 11.7067 19.749 11.6665 19.6013 11.5587C19.4537 11.4509 19.3591 11.2875 19.1697 10.9606Z"
+      fill="#DCC7FE"
+      fillOpacity="0.26"
+    />
+  </Svg>
+);
+
+const MenuIcon = ({ size = 24, color = "#fff" }) => (
+  <Svg width={size} height={size} viewBox="0 0 30 29" fill="none">
+    <G clipPath="url(#clip0_261_103)">
+      <Path
+        d="M0.834961 7.13981C0.834961 4.21843 0.834961 2.75774 1.74252 1.85018C2.65008 0.942627 4.11077 0.942627 7.03215 0.942627C9.95353 0.942627 11.4142 0.942627 12.3218 1.85018C13.2293 2.75774 13.2293 4.21843 13.2293 7.13981C13.2293 10.0612 13.2293 11.5219 12.3218 12.4295C11.4142 13.337 9.95353 13.337 7.03215 13.337C4.11077 13.337 2.65008 13.337 1.74252 12.4295C0.834961 11.5219 0.834961 10.0612 0.834961 7.13981Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+      <Path
+        d="M16.7706 22.1901C16.7706 19.2688 16.7706 17.808 17.6782 16.9005C18.5857 15.9929 20.0465 15.9929 22.9678 15.9929C25.8892 15.9929 27.3499 15.9929 28.2575 16.9005C29.165 17.808 29.165 19.2688 29.165 22.1901C29.165 25.1115 29.165 26.5722 28.2575 27.4798C27.3499 28.3873 25.8892 28.3873 22.9678 28.3873C20.0465 28.3873 18.5857 28.3873 17.6782 27.4798C16.7706 26.5722 16.7706 25.1115 16.7706 22.1901Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+      <Path
+        d="M0.834961 22.1901C0.834961 19.2688 0.834961 17.808 1.74252 16.9005C2.65008 15.9929 4.11077 15.9929 7.03215 15.9929C9.95353 15.9929 11.4142 15.9929 12.3218 16.9005C13.2293 17.808 13.2293 19.2688 13.2293 22.1901C13.2293 25.1115 13.2293 26.5722 12.3218 27.4798C11.4142 28.3873 9.95353 28.3873 7.03215 28.3873C4.11077 28.3873 2.65008 28.3873 1.74252 27.4798C0.834961 26.5722 0.834961 25.1115 0.834961 22.1901Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+      <Path
+        d="M16.7706 7.13981C16.7706 4.21843 16.7706 2.75774 17.6782 1.85018C18.5857 0.942627 20.0465 0.942627 22.9678 0.942627C25.8892 0.942627 27.3499 0.942627 28.2575 1.85018C29.165 2.75774 29.165 4.21843 29.165 7.13981C29.165 10.0612 29.165 11.5219 28.2575 12.4295C27.3499 13.337 25.8892 13.337 22.9678 13.337C20.0465 13.337 18.5857 13.337 17.6782 12.4295C16.7706 11.5219 16.7706 10.0612 16.7706 7.13981Z"
+        fill="#DCC7FE"
+        fillOpacity="0.26"
+      />
+    </G>
+    <Defs>
+      <ClipPath id="clip0_261_103">
+        <Rect
+          width="28.33"
+          height="28.33"
+          fill="white"
+          transform="translate(0.834961 0.5)"
+        />
+      </ClipPath>
+    </Defs>
+  </Svg>
+);
+
+export default function Footer({ style }) {
+const navigation = useNavigation();
+
   useEffect(() => {
-    NavigationBar.setBackgroundColorAsync("#000"); // black background
-    NavigationBar.setButtonStyleAsync("light");    // white icons
+    NavigationBar.setBackgroundColorAsync("#000");
+    NavigationBar.setButtonStyleAsync("light");
   }, []);
 
-  // Footer buttons
+  // Footer buttons with custom SVG icons
   const buttons = [
-    { name: "Dashboard", icon: <MaterialIcons name="dashboard" size={24} color="#fff" /> },
-    { name: "Products", icon: <FontAwesome5 name="box" size={24} color="#fff" /> },
-    { name: "Promos", icon: <MaterialIcons name="local-offer" size={24} color="#fff" /> },
-    { name: "Notifications", icon: <Ionicons name="notifications-outline" size={24} color="#fff" /> },
-    { name: "Profile", icon: <FontAwesome5 name="user-alt" size={24} color="#fff" /> },
+    {
+      name: "Home",
+      icon: <HomeIcon size={24} color="#fff" />,
+    },
+    {
+      name: "Members",
+      icon: <MembersIcon size={24} color="#fff" />,
+    },
+    {
+      name: "Promos",
+      icon: <PromosIcon size={24} color="#fff" />,
+    },
+    {
+      name: "Menu",
+      icon: <MenuIcon size={24} color="#fff" />,
+    },
   ];
 
   return (
+    
     <SafeAreaView edges={["bottom"]} style={[styles.footerContainer, style]}>
-      {buttons.map((btn, index) => (
+      <View style={styles.footerContent}>
+        {/* Home Button */}
         <TouchableOpacity
-          key={index}
           style={styles.button}
-          onPress={() => navigation.navigate(btn.name)}
-          activeOpacity={0.7}
+          onPress={() => navigation.navigate("Home")}
         >
-          {btn.icon}
-          <Text style={styles.buttonText}>{btn.name}</Text>
+          <HomeIcon size={24} color="#fff" />
+          <Text style={styles.buttonText}>Home</Text>
         </TouchableOpacity>
-      ))}
+
+        {/* Members Button */}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate("Members")}
+        >
+          <MembersIcon size={24} color="#fff" />
+          <Text style={styles.buttonText}>Members</Text>
+        </TouchableOpacity>
+
+        {/* Center spacer for QR button */}
+        <View style={styles.centerSpace} />
+
+        {/* Promos Button */}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate("Promos")}
+        >
+          <PromosIcon size={24} color="#fff" />
+          <Text style={styles.buttonText}>Promos</Text>
+        </TouchableOpacity>
+
+        {/* Menu Button */}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate("Menu")}
+        >
+          <MenuIcon size={24} color="#fff" />
+          <Text style={styles.buttonText}>Menu</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* QR Button floating above center */}
+      <TouchableOpacity style={styles.qrButton}>
+        <LinearGradient
+          colors={["#520CA8", "#520CA8"]}
+          style={styles.qrGradient}
+        >
+        
+          <Svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+            <Path
+              fillRule="evenodd"
+              clipRule="evenodd"
+              d="M11.05 6.84254H6.47059V11.4432C6.47059 11.832 6.31611 12.205 6.04114 12.48C5.76616 12.7549 5.39322 12.9094 5.00434 12.9094C4.61547 12.9094 4.24252 12.7549 3.96755 12.48C3.69257 12.205 3.53809 11.832 3.53809 11.4432V5.55024C3.51316 5.34443 3.53222 5.13567 3.59401 4.93778C3.6558 4.73989 3.75891 4.55738 3.89652 4.40232C4.03413 4.24726 4.20309 4.12319 4.39224 4.03833C4.58139 3.95346 4.7864 3.90973 4.99372 3.91004H11.05C11.4388 3.91004 11.8118 4.06452 12.0868 4.33949C12.3617 4.61447 12.5162 4.98741 12.5162 5.37629C12.5162 5.76516 12.3617 6.13811 12.0868 6.41308C11.8118 6.68806 11.4388 6.84254 11.05 6.84254ZM27.54 11.4378V6.85847H22.9393C22.5505 6.85847 22.1775 6.70399 21.9025 6.42902C21.6276 6.15404 21.4731 5.7811 21.4731 5.39222C21.4731 5.00335 21.6276 4.6304 21.9025 4.35543C22.1775 4.08045 22.5505 3.92597 22.9393 3.92597H28.8322C28.8899 3.91902 28.948 3.91547 29.0062 3.91535C29.3951 3.91535 29.768 4.06983 30.043 4.3448C30.318 4.61978 30.4725 4.99272 30.4725 5.3816V11.4378C30.4725 11.8267 30.318 12.1997 30.043 12.4746C29.768 12.7496 29.3951 12.9041 29.0062 12.9041C28.6173 12.9041 28.2444 12.7496 27.9694 12.4746C27.6945 12.1997 27.54 11.8267 27.54 11.4378ZM6.45997 22.5622V27.1416H11.0606C11.4495 27.1416 11.8224 27.2961 12.0974 27.5711C12.3724 27.846 12.5268 28.219 12.5268 28.6078C12.5268 28.9967 12.3724 29.3697 12.0974 29.6446C11.8224 29.9196 11.4495 30.0741 11.0606 30.0741H5.16767C4.96186 30.099 4.7531 30.08 4.55521 30.0182C4.35732 29.9564 4.17481 29.8533 4.01975 29.7157C3.86469 29.5781 3.74063 29.4091 3.65576 29.2199C3.5709 29.0308 3.52717 28.8258 3.52747 28.6185V22.5622C3.52747 22.1733 3.68195 21.8004 3.95692 21.5254C4.2319 21.2505 4.60484 21.096 4.99372 21.096C5.38259 21.096 5.75554 21.2505 6.03051 21.5254C6.30549 21.8004 6.45997 22.1733 6.45997 22.5622ZM22.95 27.1575H27.5293V22.5569C27.5293 22.168 27.6838 21.7951 27.9588 21.5201C28.2338 21.2451 28.6067 21.0907 28.9956 21.0907C29.3845 21.0907 29.7574 21.2451 30.0324 21.5201C30.3074 21.7951 30.4618 22.168 30.4618 22.5569V28.4498C30.4868 28.6556 30.4677 28.8643 30.406 29.0622C30.3442 29.2601 30.2411 29.4427 30.1035 29.5977C29.9658 29.7528 29.7969 29.8769 29.6077 29.9617C29.4186 30.0466 29.2135 30.0903 29.0062 30.09H22.95C22.5611 30.09 22.1881 29.9356 21.9132 29.6606C21.6382 29.3856 21.4837 29.0127 21.4837 28.6238C21.4837 28.2349 21.6382 27.862 21.9132 27.587C22.1881 27.312 22.5611 27.1575 22.95 27.1575Z"
+              fill="white"
+            />
+            <Path
+              d="M29.5375 15.7462H4.4625C4.19258 15.7462 3.97375 15.965 3.97375 16.235V17.765C3.97375 18.0349 4.19258 18.2537 4.4625 18.2537H29.5375C29.8074 18.2537 30.0263 18.0349 30.0263 17.765V16.235C30.0263 15.965 29.8074 15.7462 29.5375 15.7462Z"
+              fill="#FF00C8"
+            />
+          </Svg>
+        </LinearGradient>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  footerContainer: {
+footerContainer: {
+  backgroundColor: "#520CA8",
+  paddingVertical: 12,
+  width: width,
+  position: "relative",
+  borderTopLeftRadius: 45,
+  borderTopRightRadius: 45,
+
+  // iOS shadow (upwards)
+  shadowColor: "#A29BFE",
+  shadowOffset: { width: 0, height: -6 }, // stronger upward
+  shadowOpacity: 0.5, // more visible
+  shadowRadius: 20,   // keeps it soft but noticeable
+
+  // Android shadow
+  elevation: 15,       // slightly reduced for balance
+},
+
+
+  footerContent: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    backgroundColor: "#f75c3c",
-    paddingVertical: 12,
-    width: width,
+    paddingHorizontal: 20,
   },
   button: {
     alignItems: "center",
     justifyContent: "center",
+    flex: 1,
+  },
+  centerSpace: {
+    flex: 1,
+    alignItems: "center",
   },
   buttonText: {
     color: "#fff",
     fontSize: 12,
     fontWeight: "600",
+    marginTop: 4,
+  },
+  qrButton: {
+    position: "absolute",
+    top: -18,
+    left: "50%",
+    transform: [{ translateX: -30 }],
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "#AE1AE9",
+    zIndex: 10,
+    overflow: "hidden", // 👈 important for gradient rounded corners
+  },
+  qrGradient: {
+    flex: 1,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

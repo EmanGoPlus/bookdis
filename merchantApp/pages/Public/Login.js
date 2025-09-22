@@ -11,6 +11,7 @@ import {
   Platform,
   Keyboard,
   Animated,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,7 +22,11 @@ import { API_BASE_URL } from "../../apiConfig";
 import { UserContext } from "../../context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path, Circle } from "react-native-svg";
-import { useFonts, Roboto_800ExtraBold, Roboto_400Regular } from "@expo-google-fonts/roboto";
+import {
+  useFonts,
+  Roboto_800ExtraBold,
+  Roboto_600SemiBold,
+} from "@expo-google-fonts/roboto";
 
 export default function Login({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -32,10 +37,14 @@ export default function Login({ navigation }) {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [keyboardOffset] = useState(new Animated.Value(0));
+  const [isLoading, setIsLoading] = useState(false);
+
   const [fontsLoaded] = useFonts({
     Roboto_800ExtraBold,
+    Roboto_600SemiBold,
   });
 
+  // Get context after hooks
   const { login } = useContext(UserContext);
 
   useEffect(() => {
@@ -66,8 +75,6 @@ export default function Login({ navigation }) {
       keyboardWillHideListener?.remove();
     };
   }, [keyboardOffset]);
-
-  if (!fontsLoaded) return null;
 
   const handleLogin = async () => {
     try {
@@ -161,12 +168,17 @@ export default function Login({ navigation }) {
     setError(null);
   };
 
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
-    <LinearGradient  colors={["#C0CAFE", "#fff"]}
-  locations={[0, 0.7]} // 70% transition, last 30% is solid white
-  start={{ x: 0, y: 0 }}
-  end={{ x: 0, y: 1 }}
-  style={styles.background}>
+    <LinearGradient
+      colors={["#23143C", "#4F0CBD", "#6D08B1"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.background}
+    >
       <StatusBar
         barStyle="dark-content"
         translucent
@@ -192,74 +204,93 @@ export default function Login({ navigation }) {
 
             <View style={styles.form}>
               {/* Username input */}
-              <View style={styles.inputContainer}>
-                <Svg width={19} height={29} viewBox="0 0 19 29" fill="none">
-                  <Path
-                    d="M13.7 1.89999H5.29998C2.98038 1.89999 1.09998 3.7804 1.09998 6.09999V22.9C1.09998 25.2196 2.98038 27.1 5.29998 27.1H13.7C16.0196 27.1 17.9 25.2196 17.9 22.9V6.09999C17.9 3.7804 16.0196 1.89999 13.7 1.89999Z"
-                    stroke="#C047F8"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  {/* small circle at the bottom center */}
-                  <Circle
-                    cx={9.5} // center horizontally (width / 2)
-                    cy={22} // vertical position near bottom
-                    r={1.2} // radius of the dot
-                    fill="#C047F8" // same color as stroke
-                  />
-                </Svg>
-
-                <TextInput
-                  style={styles.input}
-                  placeholder="Phone / Username"
-                  value={username}
-                  onChangeText={setUsername}
-                  keyboardType="default"
-                  autoCapitalize="none"
-                  placeholderTextColor="#999"
-                />
-              </View>
-
-              {/* Password input */}
-              <View style={styles.inputContainer}>
-                <Svg width={21} height={26} viewBox="0 0 21 26" fill="none">
-                  <Path
-                    d="M10.5 17V20.2M16.8333 10.6V7.4C16.8333 5.70261 16.1661 4.07475 14.9783 2.87452C13.7906 1.67428 12.1797 1 10.5 1C8.8203 1 7.20939 1.67428 6.02166 2.87452C4.83393 4.07475 4.16667 5.70261 4.16667 7.4V10.6M18.4167 25H2.58333C2.16341 25 1.76068 24.8314 1.46375 24.5314C1.16681 24.2313 1 23.8243 1 23.4V12.2C1 11.7757 1.16681 11.3687 1.46375 11.0686C1.76068 10.7686 2.16341 10.6 2.58333 10.6H18.4167C18.8366 10.6 19.2393 10.7686 19.5363 11.0686C19.8332 11.3687 20 11.7757 20 12.2V23.4C20 23.8243 19.8332 24.2313 19.5363 24.5314C19.2393 24.8314 18.8366 25 18.4167 25Z"
-                    stroke="#C047F8"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </Svg>
-
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  placeholder="Password"
-                  placeholderTextColor="#999"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeButton}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off" : "eye"}
-                    size={20}
-                    color="#666"
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.loginButton}
-                onPress={handleLogin}
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
               >
-                <Text style={styles.loginButtonText}>Login</Text>
-              </TouchableOpacity>
+                <View style={styles.innerInputContainer}>
+                  <Svg width={19} height={29} viewBox="0 0 19 29" fill="none">
+                    <Path
+                      d="M13.7 1.89999H5.29998C2.98038 1.89999 1.09998 3.7804 1.09998 6.09999V22.9C1.09998 25.2196 2.98038 27.1 5.29998 27.1H13.7C16.0196 27.1 17.9 25.2196 17.9 22.9V6.09999C17.9 3.7804 16.0196 1.89999 13.7 1.89999Z"
+                      stroke="#C047F8"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {/* small circle at the bottom center */}
+                    <Circle
+                      cx={9.5} // center horizontally (width / 2)
+                      cy={22} // vertical position near bottom
+                      r={1.2} // radius of the dot
+                      fill="#C047F8" // same color as stroke
+                    />
+                  </Svg>
+
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Phone / Username"
+                    value={username}
+                    onChangeText={setUsername}
+                    keyboardType="default"
+                    autoCapitalize="none"
+                    placeholderTextColor="#9D87FF"
+                  />
+                </View>
+              </LinearGradient>
+              {/* Password input */}
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
+              >
+                <View style={styles.innerInputContainer}>
+                  <Svg width={21} height={26} viewBox="0 0 21 26" fill="none">
+                    <Path
+                      d="M10.5 17V20.2M16.8333 10.6V7.4C16.8333 5.70261 16.1661 4.07475 14.9783 2.87452C13.7906 1.67428 12.1797 1 10.5 1C8.8203 1 7.20939 1.67428 6.02166 2.87452C4.83393 4.07475 4.16667 5.70261 4.16667 7.4V10.6M18.4167 25H2.58333C2.16341 25 1.76068 24.8314 1.46375 24.5314C1.16681 24.2313 1 23.8243 1 23.4V12.2C1 11.7757 1.16681 11.3687 1.46375 11.0686C1.76068 10.7686 2.16341 10.6 2.58333 10.6H18.4167C18.8366 10.6 19.2393 10.7686 19.5363 11.0686C19.8332 11.3687 20 11.7757 20 12.2V23.4C20 23.8243 19.8332 24.2313 19.5363 24.5314C19.2393 24.8314 18.8366 25 18.4167 25Z"
+                      stroke="#C047F8"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </Svg>
+
+                  <TextInput
+                    style={styles.input}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    placeholder="Password"
+                    placeholderTextColor="#9D87FF"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeButton}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-off" : "eye"}
+                      size={20}
+                      color="#666"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
+              <LinearGradient
+                colors={["#5C0AE4", "#6A13D8"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.loginButton}
+              >
+                <TouchableOpacity
+                  onPress={handleLogin}
+                  style={{ width: "100%", alignItems: "center" }}
+                >
+                  <Text style={styles.loginButtonText}>Login</Text>
+                </TouchableOpacity>
+              </LinearGradient>
             </View>
 
             <View style={styles.linkRow}>
@@ -333,21 +364,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
-     borderRadius: 15,
+    borderRadius: 15,
     borderWidth: 1,
-    borderColor: "#4B1AA9",
     marginBottom: 16,
     paddingHorizontal: 16,
     width: "100%",
-    height: 60,
-    ...Platform.select({
-      ios: {
+    height: 65,
+  },
+  gradientBorderContainer: {
+    borderRadius: 15,
+    padding: 1,
+    marginBottom: 16,
+    width: "100%",
+    height: 65,
+  },
 
-      },
-      android: {
-
-      },
-    }),
+  innerInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    height: "100%",
   },
 
   input: {
@@ -364,18 +402,18 @@ const styles = StyleSheet.create({
   },
 
   loginButton: {
-    backgroundColor: "#4B1AA9",
-    paddingVertical: 18,
+      height: 65,
+  justifyContent: "center",
     borderRadius: 15,
     width: "100%",
     alignItems: "center",
     marginTop: 8,
+    overflow: "hidden",
   },
   loginButtonText: {
-    fontFamily: "Roboto_800ExtraBold",
+    fontFamily: "Roboto_600SemiBold",
     fontSize: 16,
     color: "#fff",
-    fontWeight: "700",
   },
 
   // Link Styles

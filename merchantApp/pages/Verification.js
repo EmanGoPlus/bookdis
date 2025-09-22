@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   SafeAreaView,
   Text,
@@ -10,10 +10,9 @@ import {
   ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useFonts } from "expo-font";
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-
+import { UserContext } from "../context/AuthContext";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
@@ -29,10 +28,8 @@ export default function Verification() {
 
   const [businesses, setBusinesses] = useState([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState("");
+  const { user, selectBusiness, isMerchant, logout } = useContext(UserContext);
 
-  const [fontsLoaded] = useFonts({
-    "HessGothic-Bold": require("../assets/fonts/HessGothicRoundNFW01-Bold.ttf"),
-  });
 
 useEffect(() => {
   const fetchBusinesses = async () => {
@@ -42,9 +39,9 @@ useEffect(() => {
         console.log("⚠️ No token found in AsyncStorage");
         return;
       }
-
+      
       const response = await axios.get(
-        `${API_BASE_URL}/api/user/my-businesses`,
+        `${API_BASE_URL}/api/user/merchant/my-businesses`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -60,8 +57,6 @@ useEffect(() => {
 
   fetchBusinesses();
 }, []);
-
-  if (!fontsLoaded) return null;
   
   useEffect(() => {
     (async () => {

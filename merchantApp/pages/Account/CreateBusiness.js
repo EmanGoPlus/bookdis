@@ -23,9 +23,24 @@ import SuccessModal from "../../components/successModal";
 import { BUSINESS_CATEGORIES } from "../../datas/business-category-datas";
 import { UserContext } from "../../context/AuthContext";
 import Svg, { Path, Circle } from "react-native-svg";
-import { useFonts, Roboto_800ExtraBold } from "@expo-google-fonts/roboto";
+import {
+  useFonts,
+  Roboto_800ExtraBold,
+  Roboto_600SemiBold,
+  Roboto_400Regular,
+} from "@expo-google-fonts/roboto";
 
 export default function CreateBusiness({ navigation }) {
+  const [fontsLoaded] = useFonts({
+    Roboto_800ExtraBold,
+    Roboto_600SemiBold,
+    Roboto_400Regular,
+  });
+
+  // Add UserContext
+  const { user, login, selectBusiness } = useContext(UserContext);
+
+  // Basic form states
   const [image, setImage] = useState(null);
   const [businessName, setBusinessName] = useState("");
   const [postalCode, setPostalCode] = useState("");
@@ -34,13 +49,99 @@ export default function CreateBusiness({ navigation }) {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [fontsLoaded] = useFonts({
-    Roboto_800ExtraBold,
-  });
 
-  // Add UserContext
-  const { user, login, selectBusiness } = useContext(UserContext);
+  // Category states
+  const [openMainCategory, setOpenMainCategory] = useState(false);
+  const [selectedMainCategory, setSelectedMainCategory] = useState(null);
+  const [mainCategoryItems, setMainCategoryItems] = useState([]);
+  const [customMainCategory, setCustomMainCategory] = useState("");
 
+  const [openSubCategory, setOpenSubCategory] = useState(false);
+  const [selectedSubCategory, setSelectedSubCategory] = useState(null);
+  const [subCategoryItems, setSubCategoryItems] = useState([]);
+  const [customSubCategory, setCustomSubCategory] = useState("");
+
+  // Time states
+  const [openTime, setOpenTime] = useState(null);
+  const [closeTime, setCloseTime] = useState(null);
+  const [showOpenPicker, setShowOpenPicker] = useState(false);
+  const [showClosePicker, setShowClosePicker] = useState(false);
+
+  // Address states
+  const [regions, setRegions] = useState([]);
+  const [provinces, setProvinces] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [barangays, setBarangays] = useState([]);
+
+  const [selectedRegion, setSelectedRegion] = useState(null);
+  const [selectedProvince, setSelectedProvince] = useState(null);
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [selectedBarangay, setSelectedBarangay] = useState(null);
+
+  const [openRegion, setOpenRegion] = useState(false);
+  const [openProvince, setOpenProvince] = useState(false);
+  const [openCity, setOpenCity] = useState(false);
+  const [openBarangay, setOpenBarangay] = useState(false);
+
+  // ✅ FIXED: All useEffect hooks moved after state declarations and before early returns
+
+  // Initialize main categories
+  useEffect(() => {
+    setMainCategoryItems(BUSINESS_CATEGORIES.main);
+  }, []);
+
+  // Load regions
+  useEffect(() => {
+    axios.get("https://psgc.cloud/api/regions").then((res) => {
+      setRegions(res.data.map((r) => ({ label: r.name, value: r.code })));
+    });
+  }, []);
+
+  // Load provinces when region changes
+  useEffect(() => {
+    if (selectedRegion) {
+      axios
+        .get(`https://psgc.cloud/api/regions/${selectedRegion}/provinces`)
+        .then((res) => {
+          setProvinces(res.data.map((p) => ({ label: p.name, value: p.code })));
+          setCities([]);
+          setBarangays([]);
+          setSelectedProvince(null);
+          setSelectedCity(null);
+          setSelectedBarangay(null);
+        });
+    }
+  }, [selectedRegion]);
+
+  // Load cities when province changes
+  useEffect(() => {
+    if (selectedProvince) {
+      axios
+        .get(
+          `https://psgc.cloud/api/provinces/${selectedProvince}/cities-municipalities`
+        )
+        .then((res) => {
+          setCities(res.data.map((c) => ({ label: c.name, value: c.code })));
+          setBarangays([]);
+          setSelectedCity(null);
+          setSelectedBarangay(null);
+        });
+    }
+  }, [selectedProvince]);
+
+  // Load barangays when city changes
+  useEffect(() => {
+    if (selectedCity) {
+      axios
+        .get(
+          `https://psgc.cloud/api/cities-municipalities/${selectedCity}/barangays`
+        )
+        .then((res) => {
+          setBarangays(res.data.map((b) => ({ label: b.name, value: b.code })));
+          setSelectedBarangay(null);
+        });
+    }
+  }, [selectedCity]);
   const handleCreateBusiness = async () => {
     // ==== VALIDATION ====
 
@@ -241,31 +342,6 @@ export default function CreateBusiness({ navigation }) {
     if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-  // ==== SEPARATED Category states ====
-  // Main Category
-  const [openMainCategory, setOpenMainCategory] = useState(false);
-  const [selectedMainCategory, setSelectedMainCategory] = useState(null);
-  const [mainCategoryItems, setMainCategoryItems] = useState([]);
-  const [customMainCategory, setCustomMainCategory] = useState("");
-
-  // Sub Category
-  const [openSubCategory, setOpenSubCategory] = useState(false);
-  const [selectedSubCategory, setSelectedSubCategory] = useState(null);
-  const [subCategoryItems, setSubCategoryItems] = useState([]);
-  const [customSubCategory, setCustomSubCategory] = useState("");
-
-  // Time states
-  const [openTime, setOpenTime] = useState(null);
-  const [closeTime, setCloseTime] = useState(null);
-
-  const [showOpenPicker, setShowOpenPicker] = useState(false);
-  const [showClosePicker, setShowClosePicker] = useState(false);
-
-  // Initialize main categories
-  useEffect(() => {
-    setMainCategoryItems(BUSINESS_CATEGORIES.main);
-  }, []);
-
   // Handle main category selection and load sub categories
   const handleMainCategoryChange = (value) => {
     setSelectedMainCategory(value);
@@ -278,71 +354,6 @@ export default function CreateBusiness({ navigation }) {
       setSubCategoryItems([]);
     }
   };
-
-  // ==== Address states ====
-  const [regions, setRegions] = useState([]);
-  const [provinces, setProvinces] = useState([]);
-  const [cities, setCities] = useState([]);
-  const [barangays, setBarangays] = useState([]);
-
-  const [selectedRegion, setSelectedRegion] = useState(null);
-  const [selectedProvince, setSelectedProvince] = useState(null);
-  const [selectedCity, setSelectedCity] = useState(null);
-  const [selectedBarangay, setSelectedBarangay] = useState(null);
-
-  const [openRegion, setOpenRegion] = useState(false);
-  const [openProvince, setOpenProvince] = useState(false);
-  const [openCity, setOpenCity] = useState(false);
-  const [openBarangay, setOpenBarangay] = useState(false);
-
-  useEffect(() => {
-    axios.get("https://psgc.cloud/api/regions").then((res) => {
-      setRegions(res.data.map((r) => ({ label: r.name, value: r.code })));
-    });
-  }, []);
-
-  useEffect(() => {
-    if (selectedRegion) {
-      axios
-        .get(`https://psgc.cloud/api/regions/${selectedRegion}/provinces`)
-        .then((res) => {
-          setProvinces(res.data.map((p) => ({ label: p.name, value: p.code })));
-          setCities([]);
-          setBarangays([]);
-          setSelectedProvince(null);
-          setSelectedCity(null);
-          setSelectedBarangay(null);
-        });
-    }
-  }, [selectedRegion]);
-
-  useEffect(() => {
-    if (selectedProvince) {
-      axios
-        .get(
-          `https://psgc.cloud/api/provinces/${selectedProvince}/cities-municipalities`
-        )
-        .then((res) => {
-          setCities(res.data.map((c) => ({ label: c.name, value: c.code })));
-          setBarangays([]);
-          setSelectedCity(null);
-          setSelectedBarangay(null);
-        });
-    }
-  }, [selectedProvince]);
-
-  useEffect(() => {
-    if (selectedCity) {
-      axios
-        .get(
-          `https://psgc.cloud/api/cities-municipalities/${selectedCity}/barangays`
-        )
-        .then((res) => {
-          setBarangays(res.data.map((b) => ({ label: b.name, value: b.code })));
-          setSelectedBarangay(null);
-        });
-    }
-  }, [selectedCity]);
 
   const formatTime = (date) => {
     if (!date) return ""; // or return null, depending on what you want
@@ -358,8 +369,7 @@ export default function CreateBusiness({ navigation }) {
 
   return (
     <LinearGradient
-      colors={["#C0CAFE", "#fff"]}
-      locations={[0, 0.7]} // 70% transition, last 30% is solid white
+      colors={["#23143C", "#4F0CBD", "#6D08B1"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.background}
@@ -375,19 +385,21 @@ export default function CreateBusiness({ navigation }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 50 }}
         >
-          <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-            <Svg width={15} height={44} viewBox="0 0 15 44" fill="none">
-              <Path
-                d="M13.2656 10L1.73438 21.5312L13.2656 33.0625"
-                stroke="#672BBA"
-                strokeWidth={3}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
-          </TouchableOpacity>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.navigate("Home")}>
+              <Svg width={15} height={44} viewBox="0 0 15 44" fill="none">
+                <Path
+                  d="M13.2656 10L1.73438 21.5312L13.2656 33.0625"
+                  stroke="#672BBA"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </TouchableOpacity>
 
-          <Text style={styles.text}>Business Information</Text>
+            <Text style={styles.text}>Business Information</Text>
+          </View>
 
           <View style={styles.imageContainer}>
             {/* SVG circle border */}
@@ -409,7 +421,9 @@ export default function CreateBusiness({ navigation }) {
 
             {/* Image inside */}
             <Image
-              source={image ? { uri: image } : require("../../assets/blank.png")}
+              source={
+                image ? { uri: image } : require("../../assets/blank.png")
+              }
               style={styles.logoImage}
             />
 
@@ -422,272 +436,381 @@ export default function CreateBusiness({ navigation }) {
           {/* Form */}
           <View style={styles.form}>
             {/* Business Name */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Business name</Text>
-              <TextInput
-                style={styles.input}
-                value={businessName}
-                onChangeText={setBusinessName}
-              />
-            </View>
-
-            {/* Main Category */}
-            <View
-              style={[styles.inputContainer, { zIndex: 6000, elevation: 6000 }]}
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
             >
-              <Text style={styles.label}>Main Category</Text>
-              <DropDownPicker
-                open={openMainCategory}
-                value={selectedMainCategory}
-                items={mainCategoryItems}
-                setOpen={setOpenMainCategory}
-                setValue={setSelectedMainCategory}
-                setItems={setMainCategoryItems}
-                onSelectItem={(item) => handleMainCategoryChange(item.value)}
-                listMode="SCROLLVIEW"
-                style={styles.dropdownInsideInput}
-                dropDownContainerStyle={[
-                  styles.dropdownContainer,
-                  { zIndex: 9999, elevation: 9999 },
-                ]}
-                placeholder="Select"
-                zIndex={6000}
-                zIndexInverse={1000}
-              />
-            </View>
-
-            {/* Custom Main Category Input */}
-            {selectedMainCategory === "other" && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Enter your main category</Text>
+              <View style={styles.innerInputContainer}>
+                <Text style={styles.label}>Business name</Text>
                 <TextInput
                   style={styles.input}
-                  value={customMainCategory}
-                  onChangeText={setCustomMainCategory}
+                  value={businessName}
+                  onChangeText={setBusinessName}
                 />
               </View>
+            </LinearGradient>
+
+            {/* Main Category */}
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
+            >
+              <View
+                style={[
+                  styles.innerInputContainer,
+                  { zIndex: 6000, elevation: 6000 },
+                ]}
+              >
+                <Text style={styles.label}>Main Category</Text>
+                <DropDownPicker
+                  open={openMainCategory}
+                  value={selectedMainCategory}
+                  items={mainCategoryItems}
+                  setOpen={setOpenMainCategory}
+                  setValue={setSelectedMainCategory}
+                  setItems={setMainCategoryItems}
+                  onSelectItem={(item) => handleMainCategoryChange(item.value)}
+                  listMode="MODAL"
+                  style={styles.dropdownInsideInput}
+                  dropDownContainerStyle={[
+                    styles.dropdownContainer,
+                    { zIndex: 9999, elevation: 9999 },
+                  ]}
+                  placeholder="Select"
+                  zIndex={6000}
+                  zIndexInverse={1000}
+                />
+              </View>
+            </LinearGradient>
+
+            {/* Custom Main Category Input */}
+
+            {selectedMainCategory === "other" && (
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
+              >
+                <View style={styles.innerInputContainer}>
+                  <Text style={styles.label}>Enter your main category</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={customMainCategory}
+                    onChangeText={setCustomMainCategory}
+                  />
+                </View>
+              </LinearGradient>
             )}
 
             {/* Sub Category */}
-            <View
-              style={[styles.inputContainer, { zIndex: 5500, elevation: 5500 }]}
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
             >
-              <Text style={styles.label}>Sub Category</Text>
-              <DropDownPicker
-                open={openSubCategory}
-                value={selectedSubCategory}
-                items={subCategoryItems}
-                setOpen={setOpenSubCategory}
-                setValue={setSelectedSubCategory}
-                setItems={setSubCategoryItems}
-                listMode="SCROLLVIEW"
-                style={styles.dropdownInsideInput}
-                dropDownContainerStyle={[
-                  styles.dropdownContainer,
-                  { zIndex: 9998, elevation: 9998 },
+              <View
+                style={[
+                  styles.innerInputContainer,
+                  { zIndex: 5500, elevation: 5500 },
                 ]}
-                placeholder="Select"
-                zIndex={5500}
-                zIndexInverse={1000}
-              />
-            </View>
+              >
+                <Text style={styles.label}>Sub Category</Text>
+                <DropDownPicker
+                  open={openSubCategory}
+                  value={selectedSubCategory}
+                  items={subCategoryItems}
+                  setOpen={setOpenSubCategory}
+                  setValue={setSelectedSubCategory}
+                  setItems={setSubCategoryItems}
+                  listMode="MODAL"
+                  style={styles.dropdownInsideInput}
+                  dropDownContainerStyle={[
+                    styles.dropdownContainer,
+                    { zIndex: 9998, elevation: 9998 },
+                  ]}
+                  placeholder="Select"
+                  zIndex={5500}
+                  zIndexInverse={1000}
+                />
+              </View>
+            </LinearGradient>
 
             {/* Custom Sub Category Input */}
             {selectedSubCategory === "other" && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Enter your sub-category</Text>
-                <TextInput
-                  style={styles.input}
-                  value={customSubCategory}
-                  onChangeText={setCustomSubCategory}
-                />
-              </View>
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
+              >
+                <View style={styles.innerInputContainer}>
+                  <Text style={styles.label}>Enter your sub-category</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={customSubCategory}
+                    onChangeText={setCustomSubCategory}
+                  />
+                </View>
+              </LinearGradient>
             )}
 
-            <Text style={styles.groupLabel}>Addresss</Text>
+            <Text style={styles.groupLabel}>Address</Text>
 
             {/* Region Dropdown */}
-            <View
-              style={[styles.inputContainer, { zIndex: 4000, elevation: 4000 }]}
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
             >
-              <Text style={styles.label}>Region</Text>
-              <DropDownPicker
-                open={openRegion}
-                value={selectedRegion}
-                items={regions}
-                setOpen={setOpenRegion}
-                setValue={setSelectedRegion}
-                listMode="SCROLLVIEW"
-                style={styles.dropdownInsideInput}
-                dropDownContainerStyle={[
-                  styles.dropdownContainer,
-                  { zIndex: 9997, elevation: 9997 },
+              <View
+                style={[
+                  styles.innerInputContainer,
+                  { zIndex: 4000, elevation: 4000 },
                 ]}
-                placeholder="Select Region"
-                zIndex={4000}
-              />
-            </View>
+              >
+                <Text style={styles.label}>Region</Text>
+                <DropDownPicker
+                  open={openRegion}
+                  value={selectedRegion}
+                  items={regions}
+                  setOpen={setOpenRegion}
+                  setValue={setSelectedRegion}
+                  listMode="MODAL"
+                  style={styles.dropdownInsideInput}
+                  dropDownContainerStyle={[
+                    styles.dropdownContainer,
+                    { zIndex: 9997, elevation: 9997 },
+                  ]}
+                  placeholder="Select Region"
+                  zIndex={4000}
+                />
+              </View>
+            </LinearGradient>
 
             {/* Province Dropdown */}
-            <View
-              style={[styles.inputContainer, { zIndex: 3000, elevation: 3000 }]}
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
             >
-              <Text style={styles.label}>Province</Text>
-              <DropDownPicker
-                open={openProvince}
-                value={selectedProvince}
-                items={provinces}
-                setOpen={setOpenProvince}
-                setValue={setSelectedProvince}
-                listMode="SCROLLVIEW"
-                style={styles.dropdownInsideInput}
-                dropDownContainerStyle={[
-                  styles.dropdownContainer,
-                  { zIndex: 9996, elevation: 9996 },
+              <View
+                style={[
+                  styles.innerInputContainer,
+                  { zIndex: 3000, elevation: 3000 },
                 ]}
-                placeholder="Select Province"
-                zIndex={3000}
-              />
-            </View>
+              >
+                <Text style={styles.label}>Province</Text>
+                <DropDownPicker
+                  open={openProvince}
+                  value={selectedProvince}
+                  items={provinces}
+                  setOpen={setOpenProvince}
+                  setValue={setSelectedProvince}
+                  listMode="MODAL"
+                  style={styles.dropdownInsideInput}
+                  dropDownContainerStyle={[
+                    styles.dropdownContainer,
+                    { zIndex: 9996, elevation: 9996 },
+                  ]}
+                  placeholder="Select Province"
+                  zIndex={3000}
+                />
+              </View>
+            </LinearGradient>
 
             {/* City Dropdown */}
-            <View
-              style={[styles.inputContainer, { zIndex: 2000, elevation: 2000 }]}
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
             >
-              <Text style={styles.label}>City/Municipality</Text>
-              <DropDownPicker
-                open={openCity}
-                value={selectedCity}
-                items={cities}
-                setOpen={setOpenCity}
-                setValue={setSelectedCity}
-                listMode="SCROLLVIEW"
-                style={styles.dropdownInsideInput}
-                dropDownContainerStyle={[
-                  styles.dropdownContainer,
-                  { zIndex: 9995, elevation: 9995 },
+              <View
+                style={[
+                  styles.innerInputContainer,
+                  { zIndex: 2000, elevation: 2000 },
                 ]}
-                placeholder="Select City"
-                zIndex={2000}
-              />
-            </View>
-
+              >
+                <Text style={styles.label}>City/Municipality</Text>
+                <DropDownPicker
+                  open={openCity}
+                  value={selectedCity}
+                  items={cities}
+                  setOpen={setOpenCity}
+                  setValue={setSelectedCity}
+                  listMode="MODAL"
+                  style={styles.dropdownInsideInput}
+                  dropDownContainerStyle={[
+                    styles.dropdownContainer,
+                    { zIndex: 9995, elevation: 9995 },
+                  ]}
+                  placeholder="Select City"
+                  zIndex={2000}
+                />
+              </View>
+            </LinearGradient>
             {/* Barangay Dropdown */}
-            <View
-              style={[styles.inputContainer, { zIndex: 1000, elevation: 1000 }]}
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
             >
-              <Text style={styles.label}>Barangay</Text>
-              <DropDownPicker
-                open={openBarangay}
-                value={selectedBarangay}
-                items={barangays}
-                setOpen={setOpenBarangay}
-                setValue={setSelectedBarangay}
-                listMode="SCROLLVIEW"
-                style={styles.dropdownInsideInput}
-                dropDownContainerStyle={[
-                  styles.dropdownContainer,
-                  { zIndex: 9994, elevation: 9994 },
+              <View
+                style={[
+                  styles.innerInputContainer,
+                  { zIndex: 1000, elevation: 1000 },
                 ]}
-                placeholder="Select Baranggay"
-                zIndex={1000}
-              />
-            </View>
+              >
+                <Text style={styles.label}>Barangay</Text>
+                <DropDownPicker
+                  open={openBarangay}
+                  value={selectedBarangay}
+                  items={barangays}
+                  setOpen={setOpenBarangay}
+                  setValue={setSelectedBarangay}
+                  listMode="MODAL"
+                  style={styles.dropdownInsideInput}
+                  dropDownContainerStyle={[
+                    styles.dropdownContainer,
+                    { zIndex: 9994, elevation: 9994 },
+                  ]}
+                  placeholder="Select Barangay"
+                  zIndex={1000}
+                />
+              </View>
+            </LinearGradient>
 
             {/* Postal Code */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Postal Code</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="numeric"
-                maxLength={4}
-                value={postalCode}
-                onChangeText={setPostalCode}
-              />
-            </View>
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
+            >
+              <View style={styles.innerInputContainer}>
+                <Text style={styles.label}>Postal Code</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="numeric"
+                  maxLength={4}
+                  value={postalCode}
+                  onChangeText={setPostalCode}
+                />
+              </View>
+            </LinearGradient>
 
             {/* Address Details */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Address Details</Text>
-              <TextInput
-                style={styles.input}
-                value={addressDetails}
-                onChangeText={setAddressDetails}
-              />
-            </View>
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
+            >
+              <View style={styles.innerInputContainer}>
+                <Text style={styles.label}>Address Details</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addressDetails}
+                  onChangeText={setAddressDetails}
+                />
+              </View>
+            </LinearGradient>
 
             <Text style={styles.groupLabel}>Operation Time</Text>
 
             {/* Operating Hours */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Open Time</Text>
-              <TouchableOpacity
-                style={styles.timeInput}
-                onPress={() => setShowOpenPicker(true)}
-              >
-                {openTime ? (
-                  <Text style={styles.timeText}>{formatTime(openTime)}</Text>
-                ) : (
-                  <Svg width={21} height={21} viewBox="0 0 21 21" fill="none">
-                    <Path
-                      d="M10.6751 5.79051V10.7191L9.19657 13.1834M19.5466 10.7191C19.5466 15.6187 15.5747 19.5905 10.6751 19.5905C5.77559 19.5905 1.80371 15.6187 1.80371 10.7191C1.80371 5.81953 5.77559 1.84766 10.6751 1.84766C15.5747 1.84766 19.5466 5.81953 19.5466 10.7191Z"
-                      stroke="#C5B8F4"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </Svg>
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
+            >
+              <View style={styles.innerInputContainer}>
+                <Text style={styles.label}>Open Time</Text>
+                <TouchableOpacity
+                  style={styles.timeInput}
+                  onPress={() => setShowOpenPicker(true)}
+                >
+                  {openTime ? (
+                    <Text style={styles.timeText}>{formatTime(openTime)}</Text>
+                  ) : (
+                    <Svg width={21} height={21} viewBox="0 0 21 21" fill="none">
+                      <Path
+                        d="M10.6751 5.79051V10.7191L9.19657 13.1834M19.5466 10.7191C19.5466 15.6187 15.5747 19.5905 10.6751 19.5905C5.77559 19.5905 1.80371 15.6187 1.80371 10.7191C1.80371 5.81953 5.77559 1.84766 10.6751 1.84766C15.5747 1.84766 19.5466 5.81953 19.5466 10.7191Z"
+                        stroke="#C5B8F4"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </Svg>
+                  )}
+                </TouchableOpacity>
+
+                {showOpenPicker && (
+                  <DateTimePicker
+                    value={openTime || new Date()} // fallback ensures it's always a Date
+                    mode="time"
+                    is24Hour={false}
+                    display="spinner"
+                    onChange={(event, selectedDate) => {
+                      setShowOpenPicker(false);
+                      if (selectedDate) setOpenTime(selectedDate);
+                    }}
+                  />
                 )}
-              </TouchableOpacity>
+              </View>
+            </LinearGradient>
 
-              {showOpenPicker && (
-                <DateTimePicker
-                  value={openTime || new Date()} // fallback ensures it's always a Date
-                  mode="time"
-                  is24Hour={false}
-                  display="spinner"
-                  onChange={(event, selectedDate) => {
-                    setShowOpenPicker(false);
-                    if (selectedDate) setOpenTime(selectedDate);
-                  }}
-                />
-              )}
-            </View>
+            <LinearGradient
+              colors={["#B13BFF", "#5C0AE4"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBorderContainer}
+            >
+              <View style={styles.innerInputContainer}>
+                <Text style={styles.label}>Close Time</Text>
+                <TouchableOpacity
+                  style={styles.timeInput}
+                  onPress={() => setShowClosePicker(true)}
+                >
+                  {closeTime ? (
+                    <Text style={styles.timeText}>{formatTime(closeTime)}</Text>
+                  ) : (
+                    <Svg width={21} height={21} viewBox="0 0 21 21" fill="none">
+                      <Path
+                        d="M10.6751 5.79051V10.7191L9.19657 13.1834M19.5466 10.7191C19.5466 15.6187 15.5747 19.5905 10.6751 19.5905C5.77559 19.5905 1.80371 15.6187 1.80371 10.7191C1.80371 5.81953 5.77559 1.84766 10.6751 1.84766C15.5747 1.84766 19.5466 5.81953 19.5466 10.7191Z"
+                        stroke="#C5B8F4"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </Svg>
+                  )}
+                </TouchableOpacity>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Close Time</Text>
-              <TouchableOpacity
-                style={styles.timeInput}
-                onPress={() => setShowClosePicker(true)}
-              >
-                {closeTime ? (
-                  <Text style={styles.timeText}>{formatTime(closeTime)}</Text>
-                ) : (
-                  <Svg width={21} height={21} viewBox="0 0 21 21" fill="none">
-                    <Path
-                      d="M10.6751 5.79051V10.7191L9.19657 13.1834M19.5466 10.7191C19.5466 15.6187 15.5747 19.5905 10.6751 19.5905C5.77559 19.5905 1.80371 15.6187 1.80371 10.7191C1.80371 5.81953 5.77559 1.84766 10.6751 1.84766C15.5747 1.84766 19.5466 5.81953 19.5466 10.7191Z"
-                      stroke="#C5B8F4"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </Svg>
+                {showClosePicker && (
+                  <DateTimePicker
+                    value={closeTime || new Date()} // fallback so it doesn't crash
+                    mode="time"
+                    is24Hour={false}
+                    display="spinner"
+                    onChange={(event, selectedDate) => {
+                      setShowClosePicker(false);
+                      if (selectedDate) setCloseTime(selectedDate);
+                    }}
+                  />
                 )}
-              </TouchableOpacity>
-
-              {showClosePicker && (
-                <DateTimePicker
-                  value={closeTime || new Date()} // fallback so it doesn't crash
-                  mode="time"
-                  is24Hour={false}
-                  display="spinner"
-                  onChange={(event, selectedDate) => {
-                    setShowClosePicker(false);
-                    if (selectedDate) setCloseTime(selectedDate);
-                  }}
-                />
-              )}
-            </View>
+              </View>
+            </LinearGradient>
 
             <TouchableOpacity
               onPress={handleCreateBusiness}
@@ -696,7 +819,7 @@ export default function CreateBusiness({ navigation }) {
               <LinearGradient
                 colors={["#5C0AE4", "#6A13D8"]}
                 start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.button}
               >
                 <Text style={styles.buttonText}>Save</Text>
@@ -742,16 +865,22 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
   },
 
-  text: {
-    marginTop: 10,
-    fontSize: 33,
-    color: "#4B1AA9",
-    fontFamily: "Roboto_800ExtraBold",
-    textAlign: "center",
-  },
+header: {
+  flexDirection: "row",      // horizontal layout
+  alignItems: "center",      // vertically center items
+  gap: 30,                   // spacing between items
+  padding: 10,               // optional padding
+},
+text: {
+  fontSize: 27,
+  fontFamily: "Roboto_800ExtraBold",
+  color: "#fff",
+  lineHeight: 44,            // match SVG height to vertically center
+},
+
 
   imageContainer: {
     marginTop: 40,
@@ -807,34 +936,54 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
-  inputContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#4B1AA9",
-    marginBottom: 7,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    width: "100%",
-    height: 70,
-    position: "relative",
-  },
+inputContainer: {
+  backgroundColor: "transparent", // no border — gradient handles it
+  borderRadius: 14,
+  width: "100%",
+  height: "100%",
+  position: "relative",
+},
 
-  label: {
-    position: "absolute",
-    top: 8,
-    left: 16,
-    fontSize: 12,
-    color: "#999",
-    zIndex: 1,
-  },
+gradientBorderContainer: {
+  borderRadius: 15,
+  padding: 1,            // thickness of the gradient border
+  width: "100%",
+  height: 65,
+  overflow: "hidden",    // IMPORTANT — makes the rounded corners show correctly
+  alignSelf: "stretch",  // ensure it fills the available width inside the form
+  marginBottom: 8,
+},
 
-  input: {
-    fontSize: 16,
-    color: "#000",
-    height: "100%",
-    paddingTop: 16,
-  },
+innerInputContainer: {
+  flexDirection: "row",
+  alignItems: "center",  // keeps input vertically aligned
+  backgroundColor: "#fff",
+  borderRadius: 14,
+  paddingHorizontal: 16,
+  height: "100%",
+  width: "100%",
+  position: "relative",
+  // 🔴 remove justifyContent: "center"
+},
+
+
+label: {
+  position: "absolute",
+  top: 8,
+  left: 16,
+  fontSize: 14,
+  color: "#A397CF",
+  fontFamily: "Roboto_400Regular",
+  zIndex: 2,
+},
+input: {
+  flex: 1,
+  fontSize: 16,
+  color: "#000",
+  height: "100%",
+  paddingTop: 22, // leave room for floating label
+  paddingLeft: 0,
+},
 
   dropdownInsideInput: {
     backgroundColor: "transparent",
@@ -864,7 +1013,8 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    paddingVertical: 18,
+    height: 65,
+    justifyContent: "center",
     borderRadius: 15,
     width: "100%",
     alignItems: "center",
@@ -873,15 +1023,16 @@ const styles = StyleSheet.create({
 
   buttonText: {
     fontFamily: "Roboto_800ExtraBold",
-    fontSize: 16,
+    fontSize: 18,
     color: "#fff",
     fontWeight: "700",
   },
-  cancelButton: {
-    backgroundColor: "#f5f3ff",
-    paddingVertical: 18,
-    borderRadius: 15,
 
+  cancelButton: {
+    backgroundColor: "#fff",
+    height: 65,
+    justifyContent: "center",
+    borderRadius: 15,
     width: "100%",
     alignItems: "center",
     marginTop: 8,
@@ -889,16 +1040,17 @@ const styles = StyleSheet.create({
 
   cancelButtonText: {
     fontFamily: "Roboto_800ExtraBold",
-    fontSize: 16,
+    fontSize: 18,
     color: "#702BC7",
     fontWeight: "700",
   },
+
   groupLabel: {
-    fontSize: 19,
-    color: "#380F7E",
-    fontFamily: "Roboto_800ExtraBold",
+    fontSize: 17,
+    color: "#fff",
+    fontFamily: "Roboto_600SemiBold",
     textAlign: "left",
     alignSelf: "flex-start",
-    marginBottom: "10",
+    marginBottom: 10,
   },
 });

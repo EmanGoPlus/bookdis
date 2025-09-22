@@ -9,20 +9,21 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { useFonts, Roboto_800ExtraBold } from "@expo-google-fonts/roboto";
+import { useFonts, Roboto_800ExtraBold, Roboto_600SemiBold } from "@expo-google-fonts/roboto";
 
 export default function LandingPage({ navigation }) {
   const [fontsLoaded] = useFonts({
     Roboto_800ExtraBold,
+    Roboto_600SemiBold
   });
 
   if (!fontsLoaded) return null;
 
   return (
     <LinearGradient
-      colors={["#4B1AA8", "#4515B5"]}
+      colors={["#23143C", "#4F0CBD", "#6D08B1"]}
       start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+      end={{ x: 0, y: 1 }}
       style={styles.background}
     >
       <SafeAreaView style={styles.container}>
@@ -81,6 +82,7 @@ const styles = StyleSheet.create({
     marginBottom: -40,
   },
   title: {
+        paddingHorizontal: 20,
     marginTop: 30,
     fontSize: 50,
     color: "#fff",
@@ -94,7 +96,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonBase: {
-    paddingVertical: 20,
+      height: 65,
+  justifyContent: "center",
     borderRadius: 15,
     marginTop: 20,
     width: "90%",
@@ -104,7 +107,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   loginButtonText: {
-    fontFamily: "Roboto_800Regular",
+    fontFamily: "Roboto_600SemiBold",
     fontSize: 16,
     color: "#4B1AA9",
   },
@@ -113,7 +116,7 @@ const styles = StyleSheet.create({
     borderColor: "#8D4BFF",
   },
   signUpButtonText: {
-    fontFamily: "Roboto_800Regular",
+    fontFamily: "Roboto_600SemiBold",
     fontSize: 16,
     color: "#fff",
   },

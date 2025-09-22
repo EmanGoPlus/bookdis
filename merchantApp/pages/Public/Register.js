@@ -1,0 +1,836 @@
+import React, { useState } from "react";
+import {
+  Text,
+  StyleSheet,
+  StatusBar,
+  TextInput,
+  View,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Modal,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
+import ErrorModal from "../../components/errorModal";
+import SuccessModal from "../../components/successModal";
+import { API_BASE_URL } from "../../apiConfig";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Path, Circle } from "react-native-svg";
+import {
+  useFonts,
+  Roboto_800ExtraBold,
+  Roboto_600SemiBold,
+  Roboto_400Regular,
+} from "@expo-google-fonts/roboto";
+
+export default function Register({ navigation }) {
+  const [checked, setChecked] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setConfirmShowPassword] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [error, setError] = useState(null);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    role: "merchant",
+  });
+  const [fontsLoaded] = useFonts({
+    Roboto_800ExtraBold,
+    Roboto_600SemiBold,
+    Roboto_400Regular,
+  });
+
+  const handleInputChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Invalid email format");
+      setShowErrorModal(true); // open modal immediately
+      return false;
+    }
+    return true;
+  };
+
+  const validatePassword = (password) => {
+    const minLength = 8;
+    const hasLetter = /[A-Za-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+
+    if (password.length < minLength) {
+      return "Password must be at least 8 characters long.";
+    }
+
+    if (!hasLetter) {
+      return "Password must contain at least one letter.";
+    }
+
+    if (!hasNumber) {
+      return "Password must contain at least one number.";
+    }
+
+    return null;
+  };
+
+  const handleSignup = async () => {
+    try {
+      const {
+        firstName,
+        lastName,
+        email,
+        phone,
+        password,
+        confirmPassword,
+        role,
+      } = formData;
+
+      if (!firstName || !lastName || !email || !phone || !password) {
+        setError("Please fill in all required fields");
+        setShowErrorModal(true);
+        return;
+      }
+
+      if (!validateEmail(email)) return; // stops signup if email is invalid
+
+      console.log("Sending data:", { firstName, lastName, email, phone, role });
+
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        setError(passwordError);
+        setShowErrorModal(true);
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        setShowErrorModal(true);
+        return;
+      }
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/user/register`,
+        { firstName, lastName, password, email, phone, role },
+        {
+          headers: { "Content-Type": "application/json" },
+          timeout: 10000,
+        }
+      );
+
+      console.log("Register:", response.data);
+
+      setSuccessMessage("Your account has been created successfully!");
+      setShowSuccessModal(true);
+    } catch (err) {
+      console.error("Full error object:", err);
+      console.error("Signup error:", err.response?.data || err.message);
+
+      let errorMessage = "Signup failed. Please try again.";
+
+      if (err.response) {
+        errorMessage =
+          err.response.data?.error ||
+          err.response.data?.details ||
+          errorMessage;
+      } else if (err.request) {
+        errorMessage = "Network error. Please check your connection.";
+      }
+
+      setError(errorMessage);
+      setShowErrorModal(true); // <-- THIS triggers your ErrorModal
+    }
+  };
+
+  const handleAcceptTerms = () => {
+    setChecked(true);
+    setShowTermsModal(false);
+  };
+
+  const handleDeclineTerms = () => {
+    setChecked(false);
+    setShowTermsModal(false);
+  };
+
+  const closeErrorModal = () => {
+    setShowErrorModal(false);
+    setError(null);
+  };
+
+    if (!fontsLoaded) return null;
+
+  return (
+    <LinearGradient
+colors={["#23143C", "#4F0CBD", "#6D08B1"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={styles.background}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        translucent
+        backgroundColor="transparent"
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <SafeAreaView style={styles.container}>
+            <TouchableOpacity
+              style={styles.back}
+              onPress={() => navigation.navigate("Login")}
+            >
+              <Svg width={15} height={44} viewBox="0 0 15 44" fill="none">
+                <Path
+                  d="M13.2656 10L1.73438 21.5312L13.2656 33.0625"
+                  stroke="#672BBA"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+
+            <Text style={styles.title}>Create Account</Text>
+
+            <View style={styles.signIn}>
+              <Text style={styles.signInText}>Already have an Acount? </Text>
+              <TouchableOpacity>
+                <Text
+                  style={styles.signInLink}
+                  onPress={() => navigation.navigate("Login")}
+                >
+                  Sign in
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.form}>
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
+              >
+                <View style={styles.innerInputContainer}>
+                  <Text style={styles.label}>First Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.firstName}
+                    onChangeText={(value) =>
+                      handleInputChange("firstName", value)
+                    }
+                    keyboardType="default"
+                    returnKeyType="next"
+                    autoCapitalize="words"
+                  />
+                </View>
+              </LinearGradient>
+
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
+              >
+                <View style={styles.innerInputContainer}>
+                  <Text style={styles.label}>Last Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.lastName}
+                    onChangeText={(value) =>
+                      handleInputChange("lastName", value)
+                    }
+                    keyboardType="default"
+                    returnKeyType="next"
+                    autoCapitalize="words"
+                  />
+                </View>
+              </LinearGradient>
+
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
+              >
+                <View style={styles.innerInputContainer}>
+                  <Text style={styles.label}>Email</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.email}
+                    onChangeText={(value) => handleInputChange("email", value)}
+                    keyboardType="email-address"
+                    returnKeyType="next"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </LinearGradient>
+
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
+              >
+                <View style={styles.innerInputContainer}>
+                  <Text style={styles.label}>Phone</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.phone}
+                    onChangeText={(value) => handleInputChange("phone", value)}
+                    keyboardType="phone-pad"
+                    returnKeyType="next"
+                  />
+                </View>
+              </LinearGradient>
+
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
+              >
+                <View style={styles.innerInputContainer}>
+                  <Text style={styles.label}>Password</Text>
+                  <TextInput
+                    style={[styles.input, { paddingRight: 40 }]} // give space for eye icon
+                    value={formData.password}
+                    onChangeText={(value) =>
+                      handleInputChange("password", value)
+                    }
+                    secureTextEntry={!showPassword}
+                    returnKeyType="next"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeButton}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-off" : "eye"}
+                      size={20}
+                      color="#666"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
+
+              <LinearGradient
+                colors={["#B13BFF", "#5C0AE4"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientBorderContainer}
+              >
+                <View style={styles.innerInputContainer}>
+                  <Text style={styles.label}>Confirm Password</Text>
+                  <TextInput
+                    style={[styles.input, { paddingRight: 40 }]} // give space for eye icon
+                    value={formData.confirmPassword}
+                    onChangeText={(value) =>
+                      handleInputChange("confirmPassword", value)
+                    }
+                    secureTextEntry={!showConfirmPassword}
+                    returnKeyType="next"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setConfirmShowPassword(!showConfirmPassword)}
+                    style={styles.eyeButton}
+                  >
+                    <Ionicons
+                      name={showConfirmPassword ? "eye-off" : "eye"}
+                      size={20}
+                      color="#666"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </LinearGradient>
+
+              <TouchableOpacity
+                style={styles.checkboxContainer}
+                onPress={() => setChecked(!checked)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.checkbox, checked && styles.checkedBox]}>
+                  {checked && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <View style={styles.termsTextContainer}>
+                  <TouchableOpacity onPress={() => setShowTermsModal(true)}>
+                    <Text style={styles.seeMoreText}>Terms and Agreements</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.buttonWrapper,
+                  !checked && styles.disabledButton,
+                ]}
+                onPress={checked ? handleSignup : null}
+                activeOpacity={checked ? 0.8 : 1}
+                disabled={!checked}
+              >
+                <LinearGradient
+                  colors={["#5C0AE4", "#6A13D8"]}
+                  style={styles.button}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      !checked && styles.disabledButtonText,
+                    ]}
+                  >
+                    Sign up
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Terms & Conditions Modal */}
+      <Modal
+        visible={showTermsModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowTermsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.termsModalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Terms & Conditions</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowTermsModal(false)}
+              >
+                <Text style={styles.closeButtonText}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.termsContent}
+              showsVerticalScrollIndicator={true}
+            >
+              <Text style={styles.termsText}>
+                <Text style={styles.boldText}>
+                  1. Acceptance of Terms{"\n"}
+                </Text>
+                By accessing and using this application, you accept and agree to
+                be bound by the terms and provision of this agreement.{"\n\n"}
+                <Text style={styles.boldText}>2. Privacy Policy{"\n"}</Text>
+                We respect your privacy and are committed to protecting your
+                personal data. We collect information you provide directly to
+                us, such as when you create an account or contact us for
+                support.{"\n\n"}
+                <Text style={styles.boldText}>3. User Accounts{"\n"}</Text>
+                You are responsible for safeguarding the password and for all
+                activities that occur under your account. You must notify us
+                immediately upon becoming aware of any breach of security.
+                {"\n\n"}
+                <Text style={styles.boldText}>4. Prohibited Uses{"\n"}</Text>
+                You may not use our service for any illegal or unauthorized
+                purpose. You must not transmit any worms or viruses or any code
+                of a destructive nature.{"\n\n"}
+                <Text style={styles.boldText}>5. Content{"\n"}</Text>
+                Our service allows you to post, link, store, share and otherwise
+                make available certain information, text, graphics, videos, or
+                other material. You are responsible for the content that you
+                post.{"\n\n"}
+                <Text style={styles.boldText}>6. Termination{"\n"}</Text>
+                We may terminate or suspend your account and bar access to the
+                service immediately, without prior notice or liability, under
+                our sole discretion, for any reason whatsoever.{"\n\n"}
+                <Text style={styles.boldText}>
+                  7. Limitation of Liability{"\n"}
+                </Text>
+                In no event shall BookDis, nor its directors, employees,
+                partners, agents, suppliers, or affiliates, be liable for any
+                indirect, incidental, punitive, consequential, or similar
+                damages.{"\n\n"}
+                <Text style={styles.boldText}>8. Changes to Terms{"\n"}</Text>
+                We reserve the right to modify these terms at any time. We will
+                notify users of any changes by posting the new terms on this
+                page.{"\n\n"}
+                <Text style={styles.boldText}>
+                  9. Contact Information{"\n"}
+                </Text>
+                If you have any questions about these Terms & Conditions, please
+                contact us at support@bookdis.com.
+              </Text>
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.acceptButton}
+                onPress={handleAcceptTerms}
+              >
+                <Text style={styles.acceptButtonText}>Accept</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <ErrorModal
+        visible={showErrorModal}
+        title="Login Failed"
+        message={error}
+        buttonText="Try Again"
+        onClose={closeErrorModal}
+        iconColor="#ff4757"
+        button
+        Color="#ff4757"
+      />
+
+      <SuccessModal
+        visible={showSuccessModal}
+        message={successMessage}
+        onClose={() => {
+          setShowSuccessModal(false);
+          navigation.navigate("Login");
+        }}
+      />
+    </LinearGradient>
+  );
+}
+
+const styles = StyleSheet.create({
+  background: {
+    flex: 1,
+  },
+
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 30,
+  },
+
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+
+  back: {
+    paddingHorizontal: 20,
+  },
+
+  title: {
+    fontSize: 35,
+    color: "#fff",
+    fontFamily: "Roboto_800ExtraBold",
+    paddingHorizontal: 20,
+  },
+
+  signIn: {
+    flexDirection: "row",
+    marginBottom: 10,
+    paddingHorizontal: 20,
+  },
+
+  signInText: {
+    fontSize: 16,
+    fontFamily: "Roboto_800Regular",
+    color: "#AACBFD",
+  },
+
+  signInLink: {
+    fontSize: 16,
+    fontFamily: "Roboto_800Regular",
+    color: "#AACBFD",
+    textDecorationLine: "underline",
+  },
+
+  form: {
+    marginTop: 30,
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+
+  inputContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#4B1AA9",
+    marginBottom: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: "100%",
+    height: 70,
+    position: "relative",
+  },
+
+  gradientBorderContainer: {
+    borderRadius: 15,
+    padding: 1,
+    width: "100%",
+    height: 70,
+  },
+
+  innerInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    height: "100%",
+    width: "100%", // <-- ensure it fills the gradient wrapper
+    position: "relative", // label is absolutely positioned relative to this
+  },
+
+  label: {
+    position: "absolute",
+    top: 8,
+    left: 16,
+    fontSize: 14,
+    color: "#A397CF",
+    fontFamily: "Roboto_400Regular",
+    zIndex: 2,
+  },
+
+  input: {
+    flex: 1, // <-- this is the key: make input take remaining horizontal space
+    fontSize: 16,
+    color: "#000",
+    height: "100%",
+    paddingTop: 22, // leave room for the floating label
+    paddingLeft: 0, // inner container already has horizontal padding
+  },
+
+  eyeButton: {
+    position: "absolute",
+    right: 16,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 8,
+  },
+
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    marginTop: 5,
+    marginBottom: 10,
+  },
+
+  checkbox: {
+    width: 21,
+    height: 21,
+    borderWidth: 2,
+    borderColor: "#B13BFF",
+    backgroundColor: "#fff",
+    borderRadius: 5,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+
+  checkedBox: {
+    width: 21,
+    height: 21,
+    borderWidth: 2,
+    borderColor: "#B13BFF",
+    backgroundColor: "transparent",
+    borderRadius: 5,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+
+  checkmark: {
+    color: "#f75c3c",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+
+  termsTextContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    flex: 1,
+  },
+
+  checkboxLabel: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+
+  seeMoreText: {
+    color: "#FDD6D1",
+    fontSize: 14,
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+
+  buttonWrapper: {
+    borderRadius: 8,
+    overflow: "hidden", // ensures gradient respects border radius
+    marginTop: 10,
+    marginBottom: 40,
+    width: "100%",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  button: {
+     height: 60,
+  justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 15,
+  },
+
+  buttonText: {
+    fontFamily: "Roboto_600SemiBold",
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: "500",
+  },
+
+  disabledButton: {
+    backgroundColor: "#fff",
+    opacity: 0.4,
+  },
+
+  disabledButtonText: {
+    color: "#fff",
+  },
+
+  // Terms Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+
+  termsModalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    width: "90%",
+    height: "75%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2c3e50",
+    flex: 1,
+  },
+
+  closeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#f8f9fa",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  closeButtonText: {
+    fontSize: 18,
+    color: "#6c757d",
+    fontWeight: "bold",
+  },
+
+  termsContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+
+  termsText: {
+    fontSize: 14,
+    color: "#495057",
+    lineHeight: 20,
+    textAlign: "justify",
+  },
+
+  boldText: {
+    fontWeight: "bold",
+    color: "#2c3e50",
+  },
+
+  modalButtons: {
+    flexDirection: "row",
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    gap: 10,
+  },
+
+  declineButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: "#6c757d",
+    alignItems: "center",
+  },
+
+  declineButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  acceptButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: "#f75c3c",
+    alignItems: "center",
+  },
+
+  acceptButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});

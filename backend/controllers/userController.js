@@ -14,16 +14,16 @@ const pump = util.promisify(pipeline);
 function generateRandomPassword(length = 5) {
   const charset = "abcdefghijklmnopqrstuvwxyz0123456789";
   let password = "";
-  
+
   for (let i = 0; i < length; i++) {
     password += charset.charAt(Math.floor(Math.random() * charset.length));
   }
-  
+
   return password;
 }
 
 const userController = {
-
+  
   async getAllUsers(request, reply) {
     try {
       const users = await userModel.getAllUsers();
@@ -37,90 +37,137 @@ const userController = {
   },
 
   async combinedLogin(request, reply) {
-  try {
-    const { username, password } = request.body; // Keep 'username' as the field name for consistency with your UI
+    try {
+      const { username, password } = request.body; // Keep 'username' as the field name for consistency with your UI
 
-    if (!username || !password) {
-      return reply.status(400).send({ error: "Please enter both username/phone and password" });
-    }
-
-    const loginResult = await userModel.combinedLogin(username, password);
-
-    if (!loginResult) {
-      return reply.status(401).send({ error: "Invalid credentials" });
-    }
-
-    const { user, type } = loginResult;
-
-    // Create JWT token
-    const tokenPayload = {
-      id: user.id,
-      role: user.role || type, // Use role if available, otherwise use type
-    };
-
-    // Add businessId for employees
-    if (type === 'employee' && user.businessId) {
-      tokenPayload.businessId = user.businessId;
-    }
-
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: "7d" });
-
-    // Prepare response based on user type
-    let response = {
-      message: "Login successful",
-      token,
-      userType: type
-    };
-
-    if (type === 'employee') {
-      response.user = {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phone: user.phone,
-        username: user.username,
-        role: user.role,
-        businessId: user.businessId,
-      };
-
-      // Fetch business data if businessId exists
-      if (user.businessId) {
-        try {
-          const businessResult = await db
-            .select()
-            .from(businesses) // Assuming you have a businesses table
-            .where(eq(businesses.id, user.businessId));
-          
-          if (businessResult[0]) {
-            response.business = businessResult[0];
-          }
-        } catch (businessError) {
-          console.error('Failed to fetch business data:', businessError);
-          // Continue without business data
-        }
+      if (!username || !password) {
+        return reply
+          .status(400)
+          .send({ error: "Please enter both username/phone and password" });
       }
-    } else if (type === 'merchant') {
-      response.user = {
+
+      const loginResult = await userModel.combinedLogin(username, password);
+
+      if (!loginResult) {
+        return reply.status(401).send({ error: "User Not Found" });
+      }
+
+      const { user, type } = loginResult;
+
+      // Create JWT token
+      const tokenPayload = {
         id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phone: user.phone,
-        role: user.role,
+        role: user.role || type, // Use role if available, otherwise use type
       };
 
-      // For merchants, you might want to fetch their business data differently
-      // Add business fetching logic here if needed
+      // Add businessId for employees
+      if (type === "employee" && user.businessId) {
+        tokenPayload.businessId = user.businessId;
+      }
+
+      const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+        expiresIn: "7d",
+      });
+
+      // Prepare response based on user type
+      let response = {
+        message: "Login successful",
+        token,
+        userType: type,
+      };
+
+      if (type === "employee") {
+        response.user = {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          username: user.username,
+          role: user.role,
+          businessId: user.businessId,
+        };
+
+        // Fetch business data if businessId exists
+        if (user.businessId) {
+          try {
+            const businessResult = await db
+              .select()
+              .from(businesses) // Assuming you have a businesses table
+              .where(eq(businesses.id, user.businessId));
+
+            if (businessResult[0]) {
+              response.business = businessResult[0];
+            }
+          } catch (businessError) {
+            console.error("Failed to fetch business data:", businessError);
+            // Continue without business data
+          }
+        }
+      } else if (type === "merchant") {
+        response.user = {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          role: user.role,
+        };
+
+        // For merchants, you might want to fetch their business data differently
+        // Add business fetching logic here if needed
+      }
+
+      return reply.send(response);
+    } catch (err) {
+      console.error("Error in combined login:", err);
+      reply
+        .status(500)
+        .send({ error: "Failed to login", details: err.message });
     }
+  },
 
-    return reply.send(response);
+  async customerLogin(request, reply) {
+    try {
 
-  } catch (err) {
-    console.error("Error in combined login:", err);
-    reply
-      .status(500)
-      .send({ error: "Failed to login", details: err.message });
-  }
-},
+      const {username, password} = request.body;
+
+      if (!username || !password) {
+         return reply.status(400).send({ error: "Missing fields" });
+      }
+
+      const customer = await userModel.costumerLogin(username, password);
+
+      if (!customer) {
+         return reply.status(401).send({ error: "User Not Found" });
+      }
+
+      const token = jwt.sign(
+        {
+          id: customer.id,
+          role: customer.role,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      return reply.send({
+        message: "Login successful",
+        user: {
+          id: customer.id,
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          phone: customer.phone,
+          role: customer.role,
+        },
+        token,
+      });
+
+    } catch (err) {
+      console.error("Error in combined login:", err);
+      reply
+        .status(500)
+        .send({ error: "Failed to login", details: err.message });
+    }
+  },
 
   async merchantLogin(request, reply) {
     try {
@@ -140,7 +187,6 @@ const userController = {
         {
           id: merchant.id,
           role: merchant.role,
-          // businessId: merchant.businessId
         },
         process.env.JWT_SECRET,
         { expiresIn: "7d" }
