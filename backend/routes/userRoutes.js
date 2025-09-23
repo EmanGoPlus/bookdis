@@ -27,6 +27,8 @@ async function userRoutes(fastify, options) {
 
   fastify.post("/customer-login", userController.customerLogin);
 
+  fastify.post("/customer-register", userController.customerRegister);
+
   //=============================BUSINESS=============================
 
   fastify.post("/create-business", {

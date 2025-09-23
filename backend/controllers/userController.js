@@ -379,6 +379,48 @@ const userController = {
     }
   },
 
+  async customerRegister(request, reply) {
+
+    try {
+      const {firstName, lastName, email, phone, password} = request.body;
+
+      if (!firstName || !lastName || !email || !phone || !password) {
+        return reply.status(400).send({success: false, error: "Please fill up all the required fields"})
+      };
+
+      if (phone.length !== 11) {
+        return reply.status(400).send({success: false, error: "Please enter valid phone number format"})
+      };
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailRegex.test(email)) {
+        return reply.status(400).send({success: false, error: "Please enter a valid email format"})
+      }
+
+      const customer = await userModel.customerRegister(
+        firstName,
+        lastName,
+        email,
+        phone,
+        password,
+      );
+
+      // if (!customer) {
+      //   return reply.status(404).send({success: false, error: "Failed to register employee"});
+      // }
+
+      return reply.status(201).send({success: true, message: "Customer register success!", customer: customer });
+
+
+
+    } catch (err) {
+      console.log("Error in customer register:", err);
+      return reply.status(500).send({error: "Failed to register employee", details: err.message });
+    };
+
+  },
+
   async createUser(req, reply) {
     try {
       const newUser = req.body;

@@ -5,7 +5,6 @@ import { eq, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 const userModel = {
-  
   async getUserByPhone(phone) {
     const result = await db
       .select()
@@ -101,6 +100,28 @@ const userModel = {
       .where(and(eq(customers.phone, phone), eq(customers.password, password)));
 
     return result[0] || null;
+  },
+
+  async customerRegister(firstName, lastName, email, phone, password) {
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await db.insert(customers).values({
+      firstName,
+      lastName,
+      email,
+      phone,
+      password: hashedPassword,
+    })
+    .returning({
+      id: customers.id,
+      firstName: customers.firstName,
+      lastName: customers.lastName,
+      email: customers.email,
+      phone: customers.phone,
+  });
+
+    return result[0];
   },
 
   async merchantRegister(
