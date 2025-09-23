@@ -62,7 +62,7 @@ export default function AddEmployee({ navigation }) {
 
         setBusinesses(response.data.data || []);
       } catch (err) {
-        console.error("❌ Error fetching businesses:", err.message);
+        console.error("Error fetching businesses:", err.message);
       }
     };
 
@@ -74,7 +74,7 @@ export default function AddEmployee({ navigation }) {
 
   const handleAddEmployee = async () => {
     if (!firstName || !lastName || !selectedBusinessId) {
-      setErrorMessage("⚠️ Please fill all fields and select a business.");
+      setErrorMessage("Please fill all fields and select a business.");
       setShowErrorModal(true);
       return;
     }
@@ -107,7 +107,7 @@ export default function AddEmployee({ navigation }) {
       setLastName("");
       setSelectedBusinessId("");
     } catch (err) {
-      let msg = "❌ Failed to register employee.";
+      let msg = "Failed to register employee.";
       if (err.response?.data?.error) msg = err.response.data.error;
       setErrorMessage(msg);
       setShowErrorModal(true);
@@ -190,7 +190,7 @@ export default function AddEmployee({ navigation }) {
       <Modal visible={showSuccessModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>✅ Employee Registered!</Text>
+            <Text style={styles.modalTitle}>Employee Registered!</Text>
             <Text>Username: {generatedUsername}</Text>
             <Text>Password: {generatedPassword}</Text>
 
@@ -202,7 +202,7 @@ export default function AddEmployee({ navigation }) {
               }
               style={styles.copyButton}
             >
-              <Text style={styles.copyButtonText}>📋 Copy Credentials</Text>
+              <Text style={styles.copyButtonText}>Copy Credentials</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

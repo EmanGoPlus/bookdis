@@ -1,5 +1,8 @@
 import db from "../db/config.js";
-import { promos } from "../db/schema.js"; // Updated import path
+import { claimedPromos, promos } from "../db/schema.js";
+import { nanoid } from "nanoid";
+import { eq } from "drizzle-orm"; // <-- add this
+
 
 const promoModel = {
   async createPromo(data) {
@@ -28,7 +31,10 @@ const promoModel = {
         insertData.maxRedemptions = data.maxRedemptions;
       }
 
-      if (data.maxRedemptionsPerUser !== undefined && data.maxRedemptionsPerUser !== null) {
+      if (
+        data.maxRedemptionsPerUser !== undefined &&
+        data.maxRedemptionsPerUser !== null
+      ) {
         insertData.maxRedemptionsPerUser = data.maxRedemptionsPerUser;
       }
 
@@ -37,21 +43,59 @@ const promoModel = {
       }
 
       if (data.eligibleMemberships && data.eligibleMemberships.length > 0) {
-        insertData.eligibleMemberships = JSON.stringify(data.eligibleMemberships);
+        insertData.eligibleMemberships = JSON.stringify(
+          data.eligibleMemberships
+        );
       }
 
       console.log("Final insert data:", insertData);
 
-      const result = await db
-        .insert(promos)
-        .values(insertData)
-        .returning();
+      const result = await db.insert(promos).values(insertData).returning();
 
       return result[0];
     } catch (error) {
       console.error("Database insert error:", error);
       throw error;
     }
+  },
+
+  async getPromos() {
+    const result = await db.select().from(promos);
+    return result;
+  },
+
+  async claimPromo({ promoId, customerId, membershipLevel = null }) {
+    const [promoDetails] = await db
+      .select()
+      .from(promos)
+      .where(eq(promos.id, promoId))
+      .limit(1);
+
+    const qrCode = JSON.stringify({
+      promoId,
+      customerId,
+      code: `PROMO_${nanoid(10)}`,
+      title: promoDetails?.title,
+      description: promoDetails?.description,
+      discount: promoDetails?.discount,
+      validUntil: promoDetails?.validUntil,
+    });
+
+    const [result] = await db
+      .insert(claimedPromos)
+      .values({
+        promoId,
+        customerId,
+        qrCode,
+        membershipLevel,
+      })
+      .returning();
+
+    return result;
+  },
+
+  async getPromoById(promoId) {
+    return db.select().from(promos).where(eq(promos.id, promoId)).limit(1);
   },
 };
 

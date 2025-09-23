@@ -7,16 +7,15 @@ const { width } = Dimensions.get("window");
 export default function Header() {
   return (
     <View style={styles.header}>
-      {/* Left side: logo with text */}
+
       <Image
         source={require("../assets/logo-with-text.png")}
         style={styles.logo}
         resizeMode="contain"
       />
 
-      {/* Right side: blank circle + attached SVG + notification */}
       <View style={styles.rightContainer}>
-        {/* Blank circle with attached SVG */}
+
         <View style={styles.blankWrapper}>
           <Image
             source={require("../assets/blank.png")}
@@ -72,7 +71,7 @@ export default function Header() {
           </View>
         </View>
 
-        {/* Notification circle */}
+
         <View style={styles.notif}>
           <Svg width={35} height={35.875} viewBox="0 0 40 41" fill="none">
             <Rect
@@ -112,13 +111,13 @@ const styles = StyleSheet.create({
   },
   rightContainer: {
     flexDirection: "row",
-    alignItems: "center", // vertically center all items
+    alignItems: "center", 
   },
   blankWrapper: {
     width: 60,
     height: 60,
     position: "relative",
-    marginRight: 10, // spacing between blank and notif
+    marginRight: 10, 
   },
   blankImage: {
     width: 60,

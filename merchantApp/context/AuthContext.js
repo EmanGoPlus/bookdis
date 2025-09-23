@@ -26,19 +26,19 @@ export const UserProvider = ({ children }) => {
 
         if (userData) {
           const parsedUser = JSON.parse(userData);
-          console.log("✅ AuthContext - Setting user:", parsedUser);
+          console.log("AuthContext - Setting user:", parsedUser);
           setUser(parsedUser);
         }
 
         if (businessData) {
           const parsedBusiness = JSON.parse(businessData);
           const actualBusiness = parsedBusiness.data || parsedBusiness;
-          console.log("✅ AuthContext - Setting business:", actualBusiness);
+          console.log("AuthContext - Setting business:", actualBusiness);
           setBusiness(actualBusiness);
         }
 
         if (roleData) {
-          console.log("✅ AuthContext - Setting role:", roleData);
+          console.log("AuthContext - Setting role:", roleData);
           setUserRole(roleData);
         }
 
@@ -51,10 +51,10 @@ export const UserProvider = ({ children }) => {
           role: roleData,
         });
       } catch (err) {
-        console.error("❌ AuthContext - Error loading user data:", err);
+        console.error("AuthContext - Error loading user data:", err);
       } finally {
         setLoading(false);
-        console.log("✅ AuthContext - Loading complete");
+        console.log("AuthContext - Loading complete");
       }
     };
     loadUser();
@@ -62,7 +62,7 @@ export const UserProvider = ({ children }) => {
 
   const login = async (userData, token, role = null, businessData = null) => {
     try {
-      console.log("🔄 AuthContext - Login called with:", {
+      console.log("AuthContext - Login called with:", {
         user: userData.firstName,
         role,
         business:
@@ -80,39 +80,38 @@ export const UserProvider = ({ children }) => {
       }
 
       if (businessData) {
-        // Store the business data as-is for now, we'll normalize it when loading
+
         await AsyncStorage.setItem("business", JSON.stringify(businessData));
 
-        // FIX: Handle nested structure when setting state
         const actualBusiness = businessData.data || businessData;
         setBusiness(actualBusiness);
       }
 
       setUser(userData);
 
-      console.log("✅ AuthContext - Login complete");
+      console.log("AuthContext - Login complete");
     } catch (err) {
-      console.error("❌ AuthContext - Error during login:", err);
+      console.error("AuthContext - Error during login:", err);
     }
   };
 
   const selectBusiness = async (businessData) => {
     try {
       console.log(
-        "🔄 AuthContext - Selecting business:",
+        "AuthContext - Selecting business:",
         businessData.businessName
       );
       await AsyncStorage.setItem("business", JSON.stringify(businessData));
       setBusiness(businessData);
-      console.log("✅ AuthContext - Business selected");
+      console.log("AuthContext - Business selected");
     } catch (err) {
-      console.error("❌ AuthContext - Error selecting business:", err);
+      console.error("AuthContext - Error selecting business:", err);
     }
   };
 
   const logout = async () => {
     try {
-      console.log("🔄 AuthContext - Logout called");
+      console.log("AuthContext - Logout called");
       await AsyncStorage.removeItem("token");
       await AsyncStorage.removeItem("user");
       await AsyncStorage.removeItem("business");
@@ -120,20 +119,20 @@ export const UserProvider = ({ children }) => {
       setUser(null);
       setBusiness(null);
       setUserRole(null);
-      console.log("✅ AuthContext - Logout complete");
+      console.log("AuthContext - Logout complete");
     } catch (err) {
-      console.error("❌ AuthContext - Error during logout:", err);
+      console.error("AuthContext - Error during logout:", err);
     }
   };
 
   const clearBusinessSelection = async () => {
     try {
-      console.log("🔄 AuthContext - Clearing business selection");
+      console.log("AuthContext - Clearing business selection");
       await AsyncStorage.removeItem("business");
       setBusiness(null);
-      console.log("✅ AuthContext - Business selection cleared");
+      console.log("AuthContext - Business selection cleared");
     } catch (err) {
-      console.error("❌ AuthContext - Error clearing business selection:", err);
+      console.error("AuthContext - Error clearing business selection:", err);
     }
   };
 
@@ -149,7 +148,7 @@ export const UserProvider = ({ children }) => {
         selectBusiness,
         clearBusinessSelection,
         loading,
-        // Helper functions
+     
         isMerchant: () => userRole === "merchant",
         isEmployee: () => userRole === "employee",
         hasSelectedBusiness: () => !!business,

@@ -29,14 +29,6 @@ import {
 
 export default function Dashboard({ route, navigation }) {
 
-//   const DUMMY_MEMBERS = [
-//   { id: 1, name: "Maria Santos", memberSince: "Jan 2024", visits: 25, tier: "Platinum" },
-//   { id: 2, name: "Juan Dela Cruz", memberSince: "Feb 2024", visits: 18, tier: "Gold" },
-//   { id: 3, name: "Ana Reyes", memberSince: "Mar 2024", visits: 12, tier: "Silver" },
-//   { id: 4, name: "Carlos Mendoza", memberSince: "Apr 2024", visits: 8, tier: "Bronze" },
-//   { id: 5, name: "Lucia Rodriguez", memberSince: "May 2024", visits: 30, tier: "Platinum" },
-// ];
-
   const [fontsLoaded] = useFonts({
     Roboto_800ExtraBold,
     Roboto_600SemiBold,
@@ -108,7 +100,7 @@ export default function Dashboard({ route, navigation }) {
         creditsBalance: business.creditsBalance,
       });
     } else if (!businessData.businessName && user?.businessId) {
-      // Fallback: fetch if no business data in context
+
       fetchBusinessData();
     }
   }, [business, user?.businessId]);
@@ -118,7 +110,7 @@ export default function Dashboard({ route, navigation }) {
 
     setLoading(true);
     try {
-      console.log("🏪 Fetching business data for dashboard...");
+      console.log("Fetching business data for dashboard...");
       const token = await AsyncStorage.getItem("token");
 
       const response = await axios.get(
@@ -132,7 +124,6 @@ export default function Dashboard({ route, navigation }) {
         }
       );
 
-      // Handle both nested and direct business data
       const fetchedBusiness =
         response.data.business || response.data.data || response.data;
       console.log("✅ Business data fetched for dashboard:", fetchedBusiness);
@@ -224,14 +215,6 @@ export default function Dashboard({ route, navigation }) {
       />
       <Header />
       <SafeAreaView style={styles.container}>
-        {/* Invite Section */}
-        {/* <Shadow
-          distance={14} // blur radius (matches 14px)
-          offset={[0, 6]} // shadow offset (x=0, y=6)
-          startColor={"#8800FF52"} // shadow color (rgba)
-          finalColor="transparent" // fade out
-          paintInside={false}
-        > */}
         <View style={styles.invite}>
           {/* Left SVG - User Add Icon */}
           <Svg width="21" height="23" viewBox="0 0 21 23" fill="none">

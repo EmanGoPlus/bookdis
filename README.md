@@ -35,7 +35,7 @@ npm run dev
 
 # Admin Web
 cd adminWeb
-npm install
+npm install 
 npm run dev
 
 # Backend API
@@ -65,3 +65,4 @@ root/
  # 4. Open ipConfig.js
  # 2. change the ip address
 
+using plain socket.io

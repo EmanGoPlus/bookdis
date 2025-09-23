@@ -131,7 +131,6 @@ const navigation = useNavigation();
     NavigationBar.setButtonStyleAsync("light");
   }, []);
 
-  // Footer buttons with custom SVG icons
   const buttons = [
     {
       name: "Home",
@@ -155,7 +154,7 @@ const navigation = useNavigation();
     
     <SafeAreaView edges={["bottom"]} style={[styles.footerContainer, style]}>
       <View style={styles.footerContent}>
-        {/* Home Button */}
+
         <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.navigate("Home")}
@@ -164,7 +163,7 @@ const navigation = useNavigation();
           <Text style={styles.buttonText}>Home</Text>
         </TouchableOpacity>
 
-        {/* Members Button */}
+
         <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.navigate("Members")}
@@ -173,10 +172,8 @@ const navigation = useNavigation();
           <Text style={styles.buttonText}>Members</Text>
         </TouchableOpacity>
 
-        {/* Center spacer for QR button */}
         <View style={styles.centerSpace} />
 
-        {/* Promos Button */}
         <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.navigate("Promos")}
@@ -185,7 +182,6 @@ const navigation = useNavigation();
           <Text style={styles.buttonText}>Promos</Text>
         </TouchableOpacity>
 
-        {/* Menu Button */}
         <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.navigate("Menu")}
@@ -195,8 +191,7 @@ const navigation = useNavigation();
         </TouchableOpacity>
       </View>
 
-      {/* QR Button floating above center */}
-      <TouchableOpacity style={styles.qrButton}>
+      <TouchableOpacity style={styles.qrButton} onPress={() => navigation.navigate("QrScanner")}>
         <LinearGradient
           colors={["#520CA8", "#520CA8"]}
           style={styles.qrGradient}
@@ -229,14 +224,12 @@ footerContainer: {
   borderTopLeftRadius: 45,
   borderTopRightRadius: 45,
 
-  // iOS shadow (upwards)
   shadowColor: "#A29BFE",
-  shadowOffset: { width: 0, height: -6 }, // stronger upward
-  shadowOpacity: 0.5, // more visible
-  shadowRadius: 20,   // keeps it soft but noticeable
+  shadowOffset: { width: 0, height: -6 },
+  shadowOpacity: 0.5,
+  shadowRadius: 20, 
 
-  // Android shadow
-  elevation: 15,       // slightly reduced for balance
+  elevation: 15,
 },
 
 
@@ -272,7 +265,7 @@ footerContainer: {
     borderWidth: 2,
     borderColor: "#AE1AE9",
     zIndex: 10,
-    overflow: "hidden", // 👈 important for gradient rounded corners
+    overflow: "hidden", 
   },
   qrGradient: {
     flex: 1,

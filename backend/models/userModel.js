@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 const userModel = {
+  
   async getUserByPhone(phone) {
     const result = await db
       .select()

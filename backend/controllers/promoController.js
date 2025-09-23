@@ -63,7 +63,7 @@ const promoController = {
         discountType,
         discountValue,
         validDays,
-        eligibleMemberships
+        eligibleMemberships,
       });
 
       const newPromo = await promoModel.createPromo({
@@ -91,16 +91,98 @@ const promoController = {
       console.error("Full error:", error);
       console.error("Error code:", error.code);
       console.error("Error detail:", error.detail);
-      
+
       return reply.status(500).send({
         success: false,
         message: error.message,
         // Add more error details in development
         errorCode: error.code,
-        errorDetail: error.detail
+        errorDetail: error.detail,
+      });
+    }
+  },
+
+  async getPromos(request, reply) {
+    try {
+      const promos = await promoModel.getPromos();
+      return reply.send({
+        success: true,
+        data: promos,
+      });
+    } catch (error) {
+      console.error("List promos error:", error);
+      return reply.status(500).send({
+        success: false,
+        message: error.message,
+      });
+    }
+  },
+
+  async claimPromo(request, reply) {
+    try {
+      const promoId = parseInt(request.params.id, 10);
+      const customerId = 1; // temp until auth is ready
+
+      if (!promoId) {
+        return reply.status(400).send({
+          success: false,
+          message: "Missing promoId",
+        });
+      }
+
+      // Call the model function
+      const result = await promoModel.claimPromo({
+        promoId,
+        customerId,
+        membershipLevel: null, // optional for now
+      });
+
+      return reply.status(201).send({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error("Claim promo error:", error);
+      return reply.status(500).send({
+        success: false,
+        message: "Failed to claim promo",
+        error: error.message,
+      });
+    }
+  },
+
+  async getPromoById(request, reply) {
+    try {
+      const promoId = parseInt(request.params.id, 10);
+      if (!promoId) {
+        return reply.status(400).send({
+          success: false,
+          message: "Missing promoId",
+        });
+      }
+
+      // fetch from DB (you'll need a model function for this)
+      const promo = await promoModel.getPromoById(promoId);
+
+      if (!promo) {
+        return reply.status(404).send({
+          success: false,
+          message: "Promo not found",
+        });
+      }
+
+      return reply.send({
+        success: true,
+        data: promo,
+      });
+    } catch (err) {
+      console.error("Get promo error:", err);
+      return reply.status(500).send({
+        success: false,
+        message: "Failed to fetch promo",
       });
     }
   },
 };
 
-export default promoController
+export default promoController;

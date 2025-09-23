@@ -13,8 +13,8 @@ import { Shadow } from "react-native-shadow-2";
 
 
 const { width: screenWidth } = Dimensions.get('window');
-const CARD_WIDTH = screenWidth - 40; // Full width minus padding
-const CARD_SPACING = 0; // No spacing for full page effect
+const CARD_WIDTH = screenWidth - 40; 
+const CARD_SPACING = 0; 
 
 // Sample member data
 const SAMPLE_MEMBERS = [
@@ -78,11 +78,11 @@ const MemberCard = ({ members, index }) => {
 
  return (
     <Shadow
-      distance={10}       // shadow depth
-      startColor={"#3E0994AD"} // shadow color
-      offset={[0, 6]}     // [x, y] offset
+      distance={10} 
+      startColor={"#3E0994AD"}
+      offset={[0, 6]}
       containerViewStyle={{ borderRadius: 16 }}
-      style={styles.memberCard} // still keep sizing & bgColor here
+      style={styles.memberCard}
     >
       <LinearGradient
         colors={['#ffffff', '#f8fafc']}
@@ -113,7 +113,6 @@ const MemberCard = ({ members, index }) => {
 const InfiniteMembersSwipe = ({ members = SAMPLE_MEMBERS }) => {
   const scrollViewRef = useRef(null);
   
-  // Group members into sets of 3
   const groupedMembers = [];
   for (let i = 0; i < members.length; i += 3) {
     groupedMembers.push(members.slice(i, i + 3));
@@ -122,11 +121,11 @@ const InfiniteMembersSwipe = ({ members = SAMPLE_MEMBERS }) => {
   const [currentIndex, setCurrentIndex] = useState(groupedMembers.length); // Start at first real item
   const [isScrolling, setIsScrolling] = useState(false);
   
-  // Create extended array for infinite scroll
+
   const extendedGroups = [
-    ...groupedMembers, // Clone at start
-    ...groupedMembers, // Original
-    ...groupedMembers, // Clone at end
+    ...groupedMembers,
+    ...groupedMembers,
+    ...groupedMembers,
   ];
 
   useEffect(() => {
@@ -146,10 +145,9 @@ const InfiniteMembersSwipe = ({ members = SAMPLE_MEMBERS }) => {
     return () => clearInterval(autoScroll);
   }, [currentIndex, isScrolling]);
 
-  // Handle infinite loop reset
   useEffect(() => {
     if (currentIndex >= groupedMembers.length * 2) {
-      // Reset to beginning without animation
+
       setTimeout(() => {
         scrollViewRef.current?.scrollTo({
           x: groupedMembers.length * CARD_WIDTH,
@@ -158,7 +156,7 @@ const InfiniteMembersSwipe = ({ members = SAMPLE_MEMBERS }) => {
         setCurrentIndex(groupedMembers.length);
       }, 100);
     } else if (currentIndex < groupedMembers.length) {
-      // Reset to end without animation
+
       setTimeout(() => {
         scrollViewRef.current?.scrollTo({
           x: (groupedMembers.length * 2 - 1) * CARD_WIDTH,
@@ -180,7 +178,6 @@ const InfiniteMembersSwipe = ({ members = SAMPLE_MEMBERS }) => {
     setIsScrolling(false);
   };
 
-  // Get actual display index for pagination dots
   const getDisplayIndex = () => {
     if (currentIndex < groupedMembers.length) {
       return currentIndex;

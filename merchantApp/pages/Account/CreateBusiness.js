@@ -143,7 +143,6 @@ export default function CreateBusiness({ navigation }) {
     }
   }, [selectedCity]);
   const handleCreateBusiness = async () => {
-    // ==== VALIDATION ====
 
     if (!image) {
       setError("Please upload a business logo.");
@@ -243,14 +242,12 @@ export default function CreateBusiness({ navigation }) {
 
       formData.append("businessName", businessName);
 
-      // Handle main category
       const finalMainCategory =
         selectedMainCategory === "other"
           ? customMainCategory
           : selectedMainCategory;
       formData.append("mainCategory", finalMainCategory || "");
 
-      // Handle sub category
       const finalSubCategory =
         selectedSubCategory === "other"
           ? customSubCategory
@@ -291,22 +288,18 @@ export default function CreateBusiness({ navigation }) {
         }
       );
 
-      // Store the created business data in context
       const createdBusiness = res.data.data || res.data;
       console.log("Business created successfully:", createdBusiness);
 
-      // Update the user context with the new business data
       if (createdBusiness) {
         await selectBusiness(createdBusiness);
       }
 
-      // ✅ Success modal
       setSuccessMessage("Business created successfully!");
       setShowSuccessModal(true);
     } catch (err) {
       console.error(err);
 
-      // ✅ Error modal
       setError(err.response?.data?.message || "Failed to create business.");
       setShowErrorModal(true);
     }
@@ -342,11 +335,11 @@ export default function CreateBusiness({ navigation }) {
     if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-  // Handle main category selection and load sub categories
+
   const handleMainCategoryChange = (value) => {
     setSelectedMainCategory(value);
-    setSelectedSubCategory(null); // Reset sub category
-    setCustomSubCategory(""); // Reset custom sub category
+    setSelectedSubCategory(null);
+    setCustomSubCategory("");
 
     if (value && value !== "other" && BUSINESS_CATEGORIES.sub[value]) {
       setSubCategoryItems(BUSINESS_CATEGORIES.sub[value]);
@@ -356,7 +349,7 @@ export default function CreateBusiness({ navigation }) {
   };
 
   const formatTime = (date) => {
-    if (!date) return ""; // or return null, depending on what you want
+    if (!date) return "";
     let hours = date.getHours();
     let minutes = date.getMinutes();
     const ampm = hours >= 12 ? "PM" : "AM";
@@ -402,7 +395,7 @@ export default function CreateBusiness({ navigation }) {
           </View>
 
           <View style={styles.imageContainer}>
-            {/* SVG circle border */}
+      
             <Svg
               width={170}
               height={170}
@@ -410,16 +403,15 @@ export default function CreateBusiness({ navigation }) {
               style={styles.svgCircle}
             >
               <Circle
-                cx="85" // half of 170
+                cx="85"
                 cy="85"
-                r="80" // (radius = (170 / 2) - strokeWidth/2)
+                r="80" 
                 fill="white"
                 stroke="#CAC8FF"
                 strokeWidth={9}
               />
             </Svg>
 
-            {/* Image inside */}
             <Image
               source={
                 image ? { uri: image } : require("../../assets/blank.png")
@@ -427,15 +419,12 @@ export default function CreateBusiness({ navigation }) {
               style={styles.logoImage}
             />
 
-            {/* Add button overlay */}
             <TouchableOpacity onPress={pickImage} style={styles.addButton}>
               <Text style={styles.addLogoText}>+</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Form */}
           <View style={styles.form}>
-            {/* Business Name */}
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -452,7 +441,6 @@ export default function CreateBusiness({ navigation }) {
               </View>
             </LinearGradient>
 
-            {/* Main Category */}
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -487,8 +475,6 @@ export default function CreateBusiness({ navigation }) {
               </View>
             </LinearGradient>
 
-            {/* Custom Main Category Input */}
-
             {selectedMainCategory === "other" && (
               <LinearGradient
                 colors={["#B13BFF", "#5C0AE4"]}
@@ -507,7 +493,7 @@ export default function CreateBusiness({ navigation }) {
               </LinearGradient>
             )}
 
-            {/* Sub Category */}
+
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -541,7 +527,7 @@ export default function CreateBusiness({ navigation }) {
               </View>
             </LinearGradient>
 
-            {/* Custom Sub Category Input */}
+
             {selectedSubCategory === "other" && (
               <LinearGradient
                 colors={["#B13BFF", "#5C0AE4"]}
@@ -562,7 +548,6 @@ export default function CreateBusiness({ navigation }) {
 
             <Text style={styles.groupLabel}>Address</Text>
 
-            {/* Region Dropdown */}
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -594,7 +579,7 @@ export default function CreateBusiness({ navigation }) {
               </View>
             </LinearGradient>
 
-            {/* Province Dropdown */}
+
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -626,7 +611,7 @@ export default function CreateBusiness({ navigation }) {
               </View>
             </LinearGradient>
 
-            {/* City Dropdown */}
+
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -657,7 +642,7 @@ export default function CreateBusiness({ navigation }) {
                 />
               </View>
             </LinearGradient>
-            {/* Barangay Dropdown */}
+
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -689,7 +674,7 @@ export default function CreateBusiness({ navigation }) {
               </View>
             </LinearGradient>
 
-            {/* Postal Code */}
+
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -708,7 +693,7 @@ export default function CreateBusiness({ navigation }) {
               </View>
             </LinearGradient>
 
-            {/* Address Details */}
+
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -727,7 +712,7 @@ export default function CreateBusiness({ navigation }) {
 
             <Text style={styles.groupLabel}>Operation Time</Text>
 
-            {/* Operating Hours */}
+
             <LinearGradient
               colors={["#B13BFF", "#5C0AE4"]}
               start={{ x: 0, y: 0 }}
@@ -757,7 +742,7 @@ export default function CreateBusiness({ navigation }) {
 
                 {showOpenPicker && (
                   <DateTimePicker
-                    value={openTime || new Date()} // fallback ensures it's always a Date
+                    value={openTime || new Date()}
                     mode="time"
                     is24Hour={false}
                     display="spinner"
@@ -799,7 +784,7 @@ export default function CreateBusiness({ navigation }) {
 
                 {showClosePicker && (
                   <DateTimePicker
-                    value={closeTime || new Date()} // fallback so it doesn't crash
+                    value={closeTime || new Date()}
                     mode="time"
                     is24Hour={false}
                     display="spinner"
@@ -869,16 +854,16 @@ const styles = StyleSheet.create({
   },
 
 header: {
-  flexDirection: "row",      // horizontal layout
-  alignItems: "center",      // vertically center items
-  gap: 30,                   // spacing between items
-  padding: 10,               // optional padding
+  flexDirection: "row",     
+  alignItems: "center",   
+  gap: 30,                   
+  padding: 10,             
 },
 text: {
   fontSize: 27,
   fontFamily: "Roboto_800ExtraBold",
   color: "#fff",
-  lineHeight: 44,            // match SVG height to vertically center
+  lineHeight: 44,            
 },
 
 
@@ -904,7 +889,7 @@ text: {
     position: "absolute",
     top: "50%",
     left: "50%",
-    transform: [{ translateX: -85 }, { translateY: -85 }], // half of width/height
+    transform: [{ translateX: -85 }, { translateY: -85 }], 
   },
 
   addButton: {
@@ -937,7 +922,7 @@ text: {
   },
 
 inputContainer: {
-  backgroundColor: "transparent", // no border — gradient handles it
+  backgroundColor: "transparent", 
   borderRadius: 14,
   width: "100%",
   height: "100%",
@@ -946,24 +931,24 @@ inputContainer: {
 
 gradientBorderContainer: {
   borderRadius: 15,
-  padding: 1,            // thickness of the gradient border
+  padding: 1,           
   width: "100%",
   height: 65,
-  overflow: "hidden",    // IMPORTANT — makes the rounded corners show correctly
-  alignSelf: "stretch",  // ensure it fills the available width inside the form
+  overflow: "hidden", 
+  alignSelf: "stretch",
   marginBottom: 8,
 },
 
 innerInputContainer: {
   flexDirection: "row",
-  alignItems: "center",  // keeps input vertically aligned
+  alignItems: "center",
   backgroundColor: "#fff",
   borderRadius: 14,
   paddingHorizontal: 16,
   height: "100%",
   width: "100%",
   position: "relative",
-  // 🔴 remove justifyContent: "center"
+
 },
 
 
@@ -981,7 +966,7 @@ input: {
   fontSize: 16,
   color: "#000",
   height: "100%",
-  paddingTop: 22, // leave room for floating label
+  paddingTop: 22,
   paddingLeft: 0,
 },
 

@@ -52,7 +52,7 @@ async function userRoutes(fastify, options) {
   });
 
   fastify.get(
-    //used by employee and merchant
+
     "/business/:businessId",
     { preHandler: authenticateToken },
     businessController.getBusinessById
@@ -85,6 +85,16 @@ async function userRoutes(fastify, options) {
   fastify.post("/business/create-promo", {
     preHandler: authenticateToken,
     handler: promoController.createPromo,
+  });
+
+  fastify.get("/customer/promos", promoController.getPromos);
+
+  fastify.post("/customer/claim-promo/:id", {
+    handler: promoController.claimPromo,
+  });
+
+  fastify.get("/customer/promo/:id", {
+    handler: promoController.getPromoById,
   });
 }
 

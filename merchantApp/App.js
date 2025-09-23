@@ -21,7 +21,7 @@ import AddEmployee from "./pages/Account/AddEmployee";
 import Default from "./pages/default";
 
 //to delete
-
+import QrScannerScreen from "./components/qrScreen";
 import AddPromo from "./pages/addpromo"
 
 const Stack = createNativeStackNavigator();
@@ -88,6 +88,7 @@ function AppNavigator() {
             <Stack.Screen name="Profile" component={Profile} />
             <Stack.Screen name="Credits" component={Credits} />
             <Stack.Screen name="AddEmployee" component={AddEmployee} />
+            <Stack.Screen name="QrScanner" component={QrScannerScreen} />
           </>
         ) : userRole === "employee" ? (
           // Employee Flow - Dashboard first, then other screens
