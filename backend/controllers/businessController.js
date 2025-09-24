@@ -15,7 +15,7 @@ const businessController = {
       if (!userId)
         return reply.status(400).send({ error: "User ID is required" });
 
-      const parts = request.parts(); // handle multipart form
+      const parts = request.parts();
       let businessFields = {};
       let logoPath = null;
 
@@ -34,7 +34,7 @@ const businessController = {
         }
       }
 
-      // Call the model — controller no longer touches db
+ 
       const newBusiness = await businessModel.createBusiness(userId, {
         ...businessFields,
         logo: logoPath,

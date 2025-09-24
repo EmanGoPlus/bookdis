@@ -1,20 +1,28 @@
 import React from "react";
-import { SafeAreaView, StatusBar } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
+// Public Screens
+import Register from "./pages/Public/Register";
 import Landing from "./pages/Public/Landing";
+import PartnerMap from "./pages/Public/Mapbox"; // ✅ corrected import
 
 const Stack = createNativeStackNavigator();
 
-export default function App() {
+function CustomerNavigator() {
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <StatusBar barStyle="dark-content" />
-      <NavigationContainer>
-        <Stack.Navigator initialRouteName="Landing">
-          <Stack.Screen name="Landing" component={Landing} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaView>
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="Map" component={PartnerMap} />
+        <Stack.Screen name="Register" component={Register} />
+  
+
+        <Stack.Screen name="Landing" component={Landing} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
+}
+
+export default function CustomerApp() {
+  return <CustomerNavigator />;
 }

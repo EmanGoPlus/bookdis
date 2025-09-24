@@ -23,7 +23,7 @@ async function generateBusinessCode() {
 
 const businessModel = {
   
-  //1business
+  //business
   async getBusinessById(businessId) {
     try {
       const result = await db
@@ -39,7 +39,7 @@ const businessModel = {
     }
   },
 
-  //owner
+  //owner+99+++++++++++++999999
   async getBusinessesByUser(userId) {
     try {
       const result = await db

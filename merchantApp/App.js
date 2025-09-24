@@ -26,7 +26,6 @@ import AddPromo from "./pages/addpromo"
 
 const Stack = createNativeStackNavigator();
 
-// Loading screen while checking async storage
 function LoadingScreen() {
   return (
     <View style={styles.loadingContainer}>
@@ -35,7 +34,6 @@ function LoadingScreen() {
   );
 }
 
-// Navigator with role-based and auth-aware routing
 function AppNavigator() {
   const { user, userRole, business, loading } = useContext(UserContext);
 
@@ -49,11 +47,11 @@ function AppNavigator() {
   if (loading) return <LoadingScreen />;
 
   if (!user) {
-    console.log("🔄 AppNavigator - No user, showing auth screens");
+    console.log("AppNavigator - No user, showing auth screens");
   } else if (userRole === "merchant") {
-    console.log("🔄 AppNavigator - Merchant user, showing Home first");
+    console.log("AppNavigator - Merchant user, showing Home first");
   } else if (userRole === "employee") {
-    console.log("🔄 AppNavigator - Employee user, showing Dashboard first");
+    console.log("AppNavigator - Employee user, showing Dashboard first");
   } else {
     console.log("AppNavigator - Unknown role or missing role, showing Default");
   }
@@ -62,7 +60,6 @@ function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
-          // Guest / Auth Stack
           <>
           {/* <Stack.Screen name="Landing" component={Landing} /> */}
             <Stack.Screen name="Landing" component={Landing} />{/* remove */}
@@ -78,7 +75,6 @@ function AppNavigator() {
             <Stack.Screen name="Register" component={Register} />
           </>
         ) : userRole === "merchant" ? (
-          // Merchant Flow - Home first, then other screens
           <>
             <Stack.Screen name="Home" component={Home} />
             <Stack.Screen name="AddPromo" component={AddPromo} />
@@ -91,14 +87,12 @@ function AppNavigator() {
             <Stack.Screen name="QrScanner" component={QrScannerScreen} />
           </>
         ) : userRole === "employee" ? (
-          // Employee Flow - Dashboard first, then other screens
           <>
             <Stack.Screen name="Dashboard" component={Dashboard} />
             <Stack.Screen name="Profile" component={Profile} />
             <Stack.Screen name="Credits" component={Credits} />
           </>
         ) : (
-          // Fallback for unknown roles
           <>
             <Stack.Screen name="Default" component={Default} />
           </>

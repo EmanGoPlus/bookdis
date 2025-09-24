@@ -4,6 +4,25 @@ import { merchants, employees, customers } from "../db/schema.js";
 import { eq, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
+async function generateCustomerCode() {
+  let code;
+  let exists = true;
+
+  while (exists) {
+    code = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+
+    const existing = await db
+      .select()
+      .from(customers)
+      .where(eq(customers.customerCode, code));
+
+    exists = existing.length > 0;
+  }
+
+  return code;
+}
+
+
 const userModel = {
   async getUserByPhone(phone) {
     const result = await db
@@ -102,26 +121,66 @@ const userModel = {
     return result[0] || null;
   },
 
-  async customerRegister(firstName, lastName, email, phone, password) {
+  async customerRegister(customerData) {
+    try {
+      const {
+        firstName,
+        lastName,
+        email,
+        phone,
+        password,
+        region,
+        province,
+        city,
+        barangay,
+        postalCode,
+        addressDetails,
+      } = customerData;
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+           const customerCode = await generateCustomerCode();
 
-    const result = await db.insert(customers).values({
-      firstName,
-      lastName,
-      email,
-      phone,
-      password: hashedPassword,
-    })
-    .returning({
-      id: customers.id,
-      firstName: customers.firstName,
-      lastName: customers.lastName,
-      email: customers.email,
-      phone: customers.phone,
-  });
+      const hashedPassword = await bcrypt.hash(password, 10);
 
-    return result[0];
+      const result = await db
+        .insert(customers)
+        .values({
+          customerCode,
+          firstName,
+          lastName,
+          email,
+          phone,
+          password: hashedPassword,
+          region,
+          province,
+          city,
+          barangay,
+          postalCode,
+          addressDetails,
+        })
+        .returning({
+          id: customers.id,
+          customerCode: customers.customerCode,
+          firstName: customers.firstName,
+          lastName: customers.lastName,
+          email: customers.email,
+          phone: customers.phone,
+          region: customers.region,
+          province: customers.province,
+          city: customers.city,
+          barangay: customers.baranggay,
+          postalCode: customers.postalCode,
+          addressDetails: customers.addressDetails,
+        });
+
+      if (!result || result.length === 0) {
+        throw new Error("Failed to insert customer - no data returned");
+      }
+
+      return result[0];
+    } catch (error) {
+      console.error("Database error in customerRegister:", error);
+      throw error;
+    }
   },
 
   async merchantRegister(
