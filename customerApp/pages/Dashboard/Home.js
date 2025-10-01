@@ -16,6 +16,8 @@ import {
 import axios from "axios";
 import io from "socket.io-client";
 import { API_BASE_URL } from "../../apiConfig";
+import QRCode from 'react-native-qrcode-svg';
+
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +27,7 @@ export default function Home({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [claimedPromoData, setClaimedPromoData] = useState(null);
+  const [claimedPromos, setClaimedPromos] = useState({}); // Track claimed promos
   const {
     customer,
     logout,
@@ -35,6 +38,7 @@ export default function Home({ navigation }) {
   useEffect(() => {
     if (customer?.token) {
       fetchPromos();
+      fetchClaimedPromos(); // Fetch claimed promos on mount
       setupSocket();
     }
 
@@ -64,6 +68,19 @@ export default function Home({ navigation }) {
     newSocket.on("promoUpdate", (data) => {
       console.log("Received promo update:", data);
       fetchPromos();
+    });
+
+    // Listen for promo redemption events
+    newSocket.on("promoRedeemed", (data) => {
+      console.log("Promo redeemed:", data);
+      // Refresh claimed promos to update status
+      fetchClaimedPromos();
+      
+      // Close modal if it's open and showing the redeemed promo
+      if (qrModalVisible && claimedPromoData?.claimId === data.claimId) {
+        setQrModalVisible(false);
+        Alert.alert("Success", "Your promo has been redeemed!");
+      }
     });
 
     newSocket.on("connect_error", (error) => {
@@ -115,9 +132,33 @@ export default function Home({ navigation }) {
     }
   };
 
+  const fetchClaimedPromos = async () => {
+    if (!customer?.token) return;
+
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/user/customer/claimed-promos`,
+        {
+          headers: { Authorization: `Bearer ${customer.token}` },
+        }
+      );
+
+      if (response.data && Array.isArray(response.data.data)) {
+        const claimedMap = {};
+        response.data.data.forEach((claim) => {
+          claimedMap[claim.promoId] = claim;
+        });
+        setClaimedPromos(claimedMap);
+      }
+    } catch (error) {
+      console.error("Error fetching claimed promos:", error);
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchPromos();
+    fetchClaimedPromos();
   };
 
   const handleLogout = async () => {
@@ -131,7 +172,6 @@ export default function Home({ navigation }) {
             socket.disconnect();
           }
           await logout();
-
         },
       },
     ]);
@@ -139,6 +179,19 @@ export default function Home({ navigation }) {
 
   const handleClaimPromo = async (promoId) => {
     if (!customer?.token) return;
+
+    // Check if already claimed
+    const claimData = claimedPromos[promoId];
+    if (claimData) {
+      // If already redeemed, show message
+      if (claimData.isRedeemed) {
+        Alert.alert("Already Claimed", "This promo has already been redeemed!");
+        return;
+      }
+      // Otherwise show the QR
+      handleViewQR(promoId);
+      return;
+    }
 
     try {
       const response = await axios.post(
@@ -148,21 +201,57 @@ export default function Home({ navigation }) {
       );
 
       if (response.data.success) {
-        // Store the claimed promo data (including QR code)
-        setClaimedPromoData({
+        const claimData = {
           ...response.data.data,
           promoTitle: promos.find(p => p.promoId === promoId)?.title || 'Promo'
-        });
+        };
+        
+        // Update claimed promos map
+        setClaimedPromos(prev => ({
+          ...prev,
+          [promoId]: claimData
+        }));
+        
+        setClaimedPromoData(claimData);
         setQrModalVisible(true);
         fetchPromos(); // refresh list
       } else {
         Alert.alert("Failed", response.data.message);
       }
     } catch (error) {
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "Could not claim promo"
-      );
+      // If backend says already claimed, fetch claimed promos and show QR
+      if (error.response?.status === 400 && 
+          error.response?.data?.message?.includes("claim limit")) {
+        await fetchClaimedPromos();
+        // Try to show QR after fetching
+        setTimeout(() => {
+          if (claimedPromos[promoId]) {
+            handleViewQR(promoId);
+          } else {
+            Alert.alert("Info", "You have already claimed this promo");
+          }
+        }, 500);
+      } else {
+        Alert.alert(
+          "Error",
+          error.response?.data?.message || "Could not claim promo"
+        );
+      }
+    }
+  };
+
+  const handleViewQR = (promoId) => {
+    const claimData = claimedPromos[promoId];
+    if (claimData) {
+      if (claimData.isRedeemed) {
+        Alert.alert("Already Claimed", "This promo has already been redeemed!");
+        return;
+      }
+      setClaimedPromoData({
+        ...claimData,
+        promoTitle: promos.find(p => p.promoId === promoId)?.title || 'Promo'
+      });
+      setQrModalVisible(true);
     }
   };
 
@@ -193,60 +282,88 @@ export default function Home({ navigation }) {
     });
   };
 
-  const renderPromo = ({ item }) => (
-    <View style={styles.promoCard}>
-      <View style={styles.businessHeader}>
-        {item.logo && (
+  const renderPromo = ({ item }) => {
+    const claimData = claimedPromos[item.promoId];
+    const isClaimed = !!claimData;
+    const isRedeemed = claimData?.isRedeemed || false;
+    
+    return (
+      <View style={styles.promoCard}>
+        <View style={styles.businessHeader}>
+          {item.logo && (
+            <Image
+              source={{ uri: `${API_BASE_URL}/${item.logo}` }}
+              style={styles.businessLogo}
+              resizeMode="cover"
+            />
+          )}
+          <View style={styles.businessInfo}>
+            <Text style={styles.businessName}>
+              {item.businessName || "Business"}
+            </Text>
+            <Text style={styles.promoId}>Promo #{item.promoId}</Text>
+          </View>
+          {isClaimed && (
+            <View style={isRedeemed ? styles.redeemedBadge : styles.claimedBadge}>
+              <Text style={styles.claimedBadgeText}>
+                {isRedeemed ? "claimed" : "qr generated"}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {item.imageUrl && (
           <Image
-            source={{ uri: `${API_BASE_URL}/${item.logo}` }}
-            style={styles.businessLogo}
+            source={{ uri: `${API_BASE_URL}/${item.imageUrl}` }}
+            style={styles.promoImage}
             resizeMode="cover"
           />
         )}
-        <View style={styles.businessInfo}>
-          <Text style={styles.businessName}>
-            {item.businessName || "Business"}
+
+        <View style={styles.promoContent}>
+          <Text style={styles.promoTitle}>{item.title || "Promo Title"}</Text>
+          <Text style={styles.promoDescription}>
+            {item.description || "Promo Description"}
           </Text>
-          <Text style={styles.promoId}>Promo #{item.promoId}</Text>
+
+          <View style={styles.dateContainer}>
+            {item.startDate && (
+              <Text style={styles.dateText}>
+                From: {formatDate(item.startDate)}
+              </Text>
+            )}
+            {item.endDate && (
+              <Text style={styles.dateText}>
+                Until: {formatDate(item.endDate)}
+              </Text>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={
+              isRedeemed 
+                ? styles.redeemedButton 
+                : isClaimed 
+                  ? styles.viewQrButton 
+                  : styles.claimButton
+            }
+            onPress={() => handleClaimPromo(item.promoId)}
+            disabled={isRedeemed}
+          >
+            <Text style={
+              isRedeemed 
+                ? styles.redeemedButtonText 
+                : isClaimed 
+                  ? styles.viewQrButtonText 
+                  : styles.claimButtonText
+            }>
+              {isRedeemed ? "Claimed" : isClaimed ? "View QR Code" : "Generate QR Code"}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
-
-      {item.imageUrl && (
-        <Image
-          source={{ uri: `${API_BASE_URL}/${item.imageUrl}` }}
-          style={styles.promoImage}
-          resizeMode="cover"
-        />
-      )}
-
-      <View style={styles.promoContent}>
-        <Text style={styles.promoTitle}>{item.title || "Promo Title"}</Text>
-        <Text style={styles.promoDescription}>
-          {item.description || "Promo Description"}
-        </Text>
-
-        <View style={styles.dateContainer}>
-          {item.startDate && (
-            <Text style={styles.dateText}>
-              From: {formatDate(item.startDate)}
-            </Text>
-          )}
-          {item.endDate && (
-            <Text style={styles.dateText}>
-              Until: {formatDate(item.endDate)}
-            </Text>
-          )}
-        </View>
-
-        <TouchableOpacity
-          style={styles.claimButton}
-          onPress={() => handleClaimPromo(item.promoId)}
-        >
-          <Text style={styles.claimButtonText}>Claim Promo</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   if (contextLoading) {
     return (
@@ -326,8 +443,11 @@ export default function Home({ navigation }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Promo Claimed Successfully!</Text>
-              <TouchableOpacity style={styles.closeButton} onPress={closeQrModal}>
+              <Text style={styles.modalTitle}>Your Promo QR Code</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeQrModal}
+              >
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -337,16 +457,26 @@ export default function Home({ navigation }) {
                 <Text style={styles.claimedPromoTitle}>
                   {claimedPromoData.promoTitle}
                 </Text>
-                
+
                 {/* QR Code */}
-                {claimedPromoData.qrCode && (
+                {claimedPromoData.qrCode && !claimedPromoData.isRedeemed && (
                   <View style={styles.qrContainer}>
-                    <Text style={styles.qrLabel}>Show this QR code to redeem:</Text>
-                    <Image
-                      source={{ uri: claimedPromoData.qrCode }}
-                      style={styles.qrCode}
-                      resizeMode="contain"
+                    <Text style={styles.qrLabel}>
+                      Show this QR code to redeem:
+                    </Text>
+                    <QRCode
+                      value={claimedPromoData.qrCode}
+                      size={200}
                     />
+                  </View>
+                )}
+
+                {claimedPromoData.isRedeemed && (
+                  <View style={styles.redeemedContainer}>
+                    <Text style={styles.redeemedText}>✓ Redeemed</Text>
+                    <Text style={styles.redeemedSubtext}>
+                      This promo has been successfully claimed
+                    </Text>
                   </View>
                 )}
 
@@ -361,16 +491,23 @@ export default function Home({ navigation }) {
                       Claimed: {formatDateTime(claimedPromoData.claimedAt)}
                     </Text>
                   )}
-                  {claimedPromoData.expiresAt && (
+                  {claimedPromoData.redeemedAt && (
+                    <Text style={styles.claimDetailText}>
+                      Redeemed: {formatDateTime(claimedPromoData.redeemedAt)}
+                    </Text>
+                  )}
+                  {claimedPromoData.expiresAt && !claimedPromoData.isRedeemed && (
                     <Text style={styles.claimDetailText}>
                       Expires: {formatDateTime(claimedPromoData.expiresAt)}
                     </Text>
                   )}
                 </View>
 
-                <Text style={styles.instructionText}>
-                  Present this QR code at the business to redeem your promo!
-                </Text>
+                {!claimedPromoData.isRedeemed && (
+                  <Text style={styles.instructionText}>
+                    Present this QR code at the business to redeem your promo!
+                  </Text>
+                )}
               </View>
             )}
           </View>
@@ -491,6 +628,23 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 2,
   },
+  claimedBadge: {
+    backgroundColor: "#28a745",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  redeemedBadge: {
+    backgroundColor: "#6c757d",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  claimedBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   promoImage: {
     width: "100%",
     height: 200,
@@ -529,6 +683,30 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   claimButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  viewQrButton: {
+    backgroundColor: "#28a745",
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  viewQrButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  redeemedButton: {
+    backgroundColor: "#6c757d",
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  redeemedButtonText: {
     color: "#fff",
     fontWeight: "600",
     fontSize: 14,
@@ -596,12 +774,21 @@ const styles = StyleSheet.create({
     color: "#666",
     marginBottom: 10,
   },
-  qrCode: {
-    width: 200,
-    height: 200,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
-    borderRadius: 8,
+  redeemedContainer: {
+    alignItems: "center",
+    padding: 30,
+    marginBottom: 20,
+  },
+  redeemedText: {
+    fontSize: 48,
+    color: "#28a745",
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  redeemedSubtext: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
   },
   claimDetails: {
     width: "100%",

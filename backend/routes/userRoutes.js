@@ -113,6 +113,29 @@ async function userRoutes(fastify, options) {
   fastify.get("/customer/promo/:id", {
     handler: promoController.getPromoById,
   });
+
+  fastify.get("/customer/claimed-promos", {
+    preHandler: authenticateToken,
+    handler: promoController.getClaimedPromos,
+  });
+
+  fastify.get("/customer/promos/:id/claim", {
+    preHandler: authenticateToken,
+    handler: promoController.getClaimForPromo,
+  });
+
+  // For employees
+  fastify.post("/employee/redeem-promo", {
+    preHandler: authenticateToken,
+    handler: promoController.redeemPromo,
+  });
+
+  // For merchants
+  fastify.post("/merchant/redeem-promo", {
+    preHandler: authenticateToken,
+    handler: promoController.redeemPromo,
+  });
+
   //=============================MEMBERSHIP=============================
   fastify.post("/customer/membership", {
     preHandler: authenticateToken,
