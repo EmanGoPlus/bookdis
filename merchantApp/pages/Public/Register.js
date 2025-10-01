@@ -5,7 +5,6 @@ import {
   StatusBar,
   TextInput,
   View,
-  Image,
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
@@ -14,18 +13,13 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from "axios";
 import ErrorModal from "../../components/errorModal";
 import SuccessModal from "../../components/successModal";
 import { API_BASE_URL } from "../../apiConfig";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Path, Circle } from "react-native-svg";
-import {
-  useFonts,
-  Roboto_800ExtraBold,
-  Roboto_600SemiBold,
-  Roboto_400Regular,
-} from "@expo-google-fonts/roboto";
+import Svg, { Path } from "react-native-svg";
 
 export default function Register({ navigation }) {
   const [checked, setChecked] = useState(false);
@@ -36,6 +30,11 @@ export default function Register({ navigation }) {
   const [successMessage, setSuccessMessage] = useState("");
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Birthday state - set to a reasonable default (25 years ago)
+  const [birthday, setBirthday] = useState(new Date(2000, 0, 1));
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -45,11 +44,6 @@ export default function Register({ navigation }) {
     confirmPassword: "",
     role: "merchant",
   });
-  const [fontsLoaded] = useFonts({
-    Roboto_800ExtraBold,
-    Roboto_600SemiBold,
-    Roboto_400Regular,
-  });
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -58,11 +52,30 @@ export default function Register({ navigation }) {
     }));
   };
 
+  const handleDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setBirthday(selectedDate);
+    }
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  };
+
+  const formatDateForAPI = (date) => {
+    return date.toISOString().split('T')[0];
+  };
+
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError("Invalid email format");
-      setShowErrorModal(true); // open modal immediately
+      setShowErrorModal(true);
       return false;
     }
     return true;
@@ -76,15 +89,38 @@ export default function Register({ navigation }) {
     if (password.length < minLength) {
       return "Password must be at least 8 characters long.";
     }
-
     if (!hasLetter) {
       return "Password must contain at least one letter.";
     }
-
     if (!hasNumber) {
       return "Password must contain at least one number.";
     }
+    return null;
+  };
 
+  const validateAge = (birthDate) => {
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    if (age < 18) {
+      return "You must be at least 18 years old to register as a merchant.";
+    }
+    if (age > 120) {
+      return "Please enter a valid birth date.";
+    }
+    return null;
+  };
+
+  const validatePhone = (phone) => {
+    const normalizedPhone = phone.replace(/\D/g, "");
+    if (normalizedPhone.length !== 11) {
+      return "Phone number must be exactly 11 digits.";
+    }
     return null;
   };
 
@@ -100,15 +136,28 @@ export default function Register({ navigation }) {
         role,
       } = formData;
 
-      if (!firstName || !lastName || !email || !phone || !password) {
-        setError("Please fill in all required fields");
+      // Validation checks
+      if (!firstName || !lastName || !email || !phone || !password || !birthday) {
+        setError("Please fill in all required fields including birthday");
         setShowErrorModal(true);
         return;
       }
 
-      if (!validateEmail(email)) return; // stops signup if email is invalid
+      if (!validateEmail(email)) return;
 
-      console.log("Sending data:", { firstName, lastName, email, phone, role });
+      const phoneError = validatePhone(phone);
+      if (phoneError) {
+        setError(phoneError);
+        setShowErrorModal(true);
+        return;
+      }
+
+      const ageError = validateAge(birthday);
+      if (ageError) {
+        setError(ageError);
+        setShowErrorModal(true);
+        return;
+      }
 
       const passwordError = validatePassword(password);
       if (passwordError) {
@@ -125,19 +174,24 @@ export default function Register({ navigation }) {
 
       const response = await axios.post(
         `${API_BASE_URL}/api/user/register`,
-        { firstName, lastName, password, email, phone, role },
+        { 
+          firstName, 
+          lastName, 
+          password, 
+          email, 
+          phone: phone.replace(/\D/g, ""),
+          birthday: formatDateForAPI(birthday),
+          role 
+        },
         {
           headers: { "Content-Type": "application/json" },
           timeout: 10000,
         }
       );
 
-      console.log("Register:", response.data);
-
-      setSuccessMessage("Your account has been created successfully!");
+      setSuccessMessage("Your merchant account has been created successfully!");
       setShowSuccessModal(true);
     } catch (err) {
-      console.error("Full error object:", err);
       console.error("Signup error:", err.response?.data || err.message);
 
       let errorMessage = "Signup failed. Please try again.";
@@ -152,7 +206,7 @@ export default function Register({ navigation }) {
       }
 
       setError(errorMessage);
-      setShowErrorModal(true); // <-- THIS triggers your ErrorModal
+      setShowErrorModal(true);
     }
   };
 
@@ -161,49 +215,33 @@ export default function Register({ navigation }) {
     setShowTermsModal(false);
   };
 
-  const handleDeclineTerms = () => {
-    setChecked(false);
-    setShowTermsModal(false);
-  };
-
   const closeErrorModal = () => {
     setShowErrorModal(false);
     setError(null);
   };
 
-    if (!fontsLoaded) return null;
-
   return (
     <LinearGradient
-colors={["#23143C", "#4F0CBD", "#6D08B1"]}
+      colors={["#23143C", "#4F0CBD", "#6D08B1"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.background}
     >
-      <StatusBar
-        barStyle="dark-content"
-        translucent
-        backgroundColor="transparent"
-      />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoidingView}
+        style={styles.container}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <SafeAreaView style={styles.safeArea}>
             <TouchableOpacity
-              style={styles.back}
+              style={styles.backButton}
               onPress={() => navigation.navigate("Login")}
             >
-              <Svg width={15} height={44} viewBox="0 0 15 44" fill="none">
+              <Svg width={15} height={24} viewBox="0 0 15 24" fill="none">
                 <Path
-                  d="M13.2656 10L1.73438 21.5312L13.2656 33.0625"
+                  d="M13.2656 2L1.73438 13.5312L13.2656 25.0625"
                   stroke="#672BBA"
                   strokeWidth={3}
                   strokeLinecap="round"
@@ -212,115 +250,83 @@ colors={["#23143C", "#4F0CBD", "#6D08B1"]}
               </Svg>
             </TouchableOpacity>
 
-            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.title}>Create Merchant Account</Text>
 
-            <View style={styles.signIn}>
-              <Text style={styles.signInText}>Already have an Acount? </Text>
-              <TouchableOpacity>
-                <Text
-                  style={styles.signInLink}
-                  onPress={() => navigation.navigate("Login")}
-                >
-                  Sign in
-                </Text>
+            <View style={styles.signInContainer}>
+              <Text style={styles.signInText}>Already have an Account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+                <Text style={styles.signInLink}>Sign in</Text>
               </TouchableOpacity>
             </View>
+            
             <View style={styles.form}>
-              <LinearGradient
-                colors={["#B13BFF", "#5C0AE4"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientBorderContainer}
-              >
-                <View style={styles.innerInputContainer}>
-                  <Text style={styles.label}>First Name</Text>
+              {/* First Name */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>First Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.firstName}
+                  onChangeText={(value) => handleInputChange("firstName", value)}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              {/* Last Name */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Last Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.lastName}
+                  onChangeText={(value) => handleInputChange("lastName", value)}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              {/* Email */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.email}
+                  onChangeText={(value) => handleInputChange("email", value)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              {/* Phone */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Phone (11 digits)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.phone}
+                  onChangeText={(value) => handleInputChange("phone", value)}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                />
+              </View>
+
+              {/* Birthday */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Birthday (18+ required)</Text>
+                <TouchableOpacity 
+                  style={styles.dateInput}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={styles.dateText}>{formatDate(birthday)}</Text>
+                  <Ionicons name="calendar-outline" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Password */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Password</Text>
+                <View style={styles.passwordContainer}>
                   <TextInput
                     style={styles.input}
-                    value={formData.firstName}
-                    onChangeText={(value) =>
-                      handleInputChange("firstName", value)
-                    }
-                    keyboardType="default"
-                    returnKeyType="next"
-                    autoCapitalize="words"
-                  />
-                </View>
-              </LinearGradient>
-
-              <LinearGradient
-                colors={["#B13BFF", "#5C0AE4"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientBorderContainer}
-              >
-                <View style={styles.innerInputContainer}>
-                  <Text style={styles.label}>Last Name</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.lastName}
-                    onChangeText={(value) =>
-                      handleInputChange("lastName", value)
-                    }
-                    keyboardType="default"
-                    returnKeyType="next"
-                    autoCapitalize="words"
-                  />
-                </View>
-              </LinearGradient>
-
-              <LinearGradient
-                colors={["#B13BFF", "#5C0AE4"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientBorderContainer}
-              >
-                <View style={styles.innerInputContainer}>
-                  <Text style={styles.label}>Email</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.email}
-                    onChangeText={(value) => handleInputChange("email", value)}
-                    keyboardType="email-address"
-                    returnKeyType="next"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </LinearGradient>
-
-              <LinearGradient
-                colors={["#B13BFF", "#5C0AE4"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientBorderContainer}
-              >
-                <View style={styles.innerInputContainer}>
-                  <Text style={styles.label}>Phone</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.phone}
-                    onChangeText={(value) => handleInputChange("phone", value)}
-                    keyboardType="phone-pad"
-                    returnKeyType="next"
-                  />
-                </View>
-              </LinearGradient>
-
-              <LinearGradient
-                colors={["#B13BFF", "#5C0AE4"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientBorderContainer}
-              >
-                <View style={styles.innerInputContainer}>
-                  <Text style={styles.label}>Password</Text>
-                  <TextInput
-                    style={[styles.input, { paddingRight: 40 }]} // give space for eye icon
                     value={formData.password}
-                    onChangeText={(value) =>
-                      handleInputChange("password", value)
-                    }
+                    onChangeText={(value) => handleInputChange("password", value)}
                     secureTextEntry={!showPassword}
-                    returnKeyType="next"
                   />
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
@@ -333,24 +339,17 @@ colors={["#23143C", "#4F0CBD", "#6D08B1"]}
                     />
                   </TouchableOpacity>
                 </View>
-              </LinearGradient>
+              </View>
 
-              <LinearGradient
-                colors={["#B13BFF", "#5C0AE4"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.gradientBorderContainer}
-              >
-                <View style={styles.innerInputContainer}>
-                  <Text style={styles.label}>Confirm Password</Text>
+              {/* Confirm Password */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Confirm Password</Text>
+                <View style={styles.passwordContainer}>
                   <TextInput
-                    style={[styles.input, { paddingRight: 40 }]} // give space for eye icon
+                    style={styles.input}
                     value={formData.confirmPassword}
-                    onChangeText={(value) =>
-                      handleInputChange("confirmPassword", value)
-                    }
+                    onChangeText={(value) => handleInputChange("confirmPassword", value)}
                     secureTextEntry={!showConfirmPassword}
-                    returnKeyType="next"
                   />
                   <TouchableOpacity
                     onPress={() => setConfirmShowPassword(!showConfirmPassword)}
@@ -363,54 +362,71 @@ colors={["#23143C", "#4F0CBD", "#6D08B1"]}
                     />
                   </TouchableOpacity>
                 </View>
-              </LinearGradient>
+              </View>
 
+              {/* Terms Checkbox */}
               <TouchableOpacity
                 style={styles.checkboxContainer}
                 onPress={() => setChecked(!checked)}
-                activeOpacity={0.7}
               >
                 <View style={[styles.checkbox, checked && styles.checkedBox]}>
                   {checked && <Text style={styles.checkmark}>✓</Text>}
                 </View>
-                <View style={styles.termsTextContainer}>
-                  <TouchableOpacity onPress={() => setShowTermsModal(true)}>
-                    <Text style={styles.seeMoreText}>Terms and Agreements</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity onPress={() => setShowTermsModal(true)}>
+                  <Text style={styles.termsText}>Terms and Agreements</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
 
+              {/* Submit Button */}
               <TouchableOpacity
-                style={[
-                  styles.buttonWrapper,
-                  !checked && styles.disabledButton,
-                ]}
+                style={[styles.submitButton, !checked && styles.disabledButton]}
                 onPress={checked ? handleSignup : null}
-                activeOpacity={checked ? 0.8 : 1}
                 disabled={!checked}
               >
-                <LinearGradient
-                  colors={["#5C0AE4", "#6A13D8"]}
-                  style={styles.button}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Text
-                    style={[
-                      styles.buttonText,
-                      !checked && styles.disabledButtonText,
-                    ]}
-                  >
-                    Sign up
-                  </Text>
-                </LinearGradient>
+                <Text style={styles.submitButtonText}>
+                  Create Merchant Account
+                </Text>
               </TouchableOpacity>
             </View>
           </SafeAreaView>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Terms & Conditions Modal */}
+      {/* Date Picker Modal */}
+      {showDatePicker && (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          visible={showDatePicker}
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.datePickerContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Birthday</Text>
+                <TouchableOpacity
+                  style={styles.doneButton}
+                  onPress={() => setShowDatePicker(false)}
+                >
+                  <Text style={styles.doneButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={birthday}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+                minimumDate={new Date(1900, 0, 1)}
+                textColor="#000"
+                style={styles.datePicker}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Terms Modal */}
       <Modal
         visible={showTermsModal}
         transparent={true}
@@ -418,90 +434,36 @@ colors={["#23143C", "#4F0CBD", "#6D08B1"]}
         onRequestClose={() => setShowTermsModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.termsModalContainer}>
+          <View style={styles.termsModal}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Terms & Conditions</Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setShowTermsModal(false)}
-              >
-                <Text style={styles.closeButtonText}>×</Text>
+              <TouchableOpacity onPress={() => setShowTermsModal(false)}>
+                <Text style={styles.closeButton}>×</Text>
               </TouchableOpacity>
             </View>
-
-            <ScrollView
-              style={styles.termsContent}
-              showsVerticalScrollIndicator={true}
-            >
-              <Text style={styles.termsText}>
-                <Text style={styles.boldText}>
-                  1. Acceptance of Terms{"\n"}
-                </Text>
-                By accessing and using this application, you accept and agree to
-                be bound by the terms and provision of this agreement.{"\n\n"}
-                <Text style={styles.boldText}>2. Privacy Policy{"\n"}</Text>
-                We respect your privacy and are committed to protecting your
-                personal data. We collect information you provide directly to
-                us, such as when you create an account or contact us for
-                support.{"\n\n"}
-                <Text style={styles.boldText}>3. User Accounts{"\n"}</Text>
-                You are responsible for safeguarding the password and for all
-                activities that occur under your account. You must notify us
-                immediately upon becoming aware of any breach of security.
-                {"\n\n"}
-                <Text style={styles.boldText}>4. Prohibited Uses{"\n"}</Text>
-                You may not use our service for any illegal or unauthorized
-                purpose. You must not transmit any worms or viruses or any code
-                of a destructive nature.{"\n\n"}
-                <Text style={styles.boldText}>5. Content{"\n"}</Text>
-                Our service allows you to post, link, store, share and otherwise
-                make available certain information, text, graphics, videos, or
-                other material. You are responsible for the content that you
-                post.{"\n\n"}
-                <Text style={styles.boldText}>6. Termination{"\n"}</Text>
-                We may terminate or suspend your account and bar access to the
-                service immediately, without prior notice or liability, under
-                our sole discretion, for any reason whatsoever.{"\n\n"}
-                <Text style={styles.boldText}>
-                  7. Limitation of Liability{"\n"}
-                </Text>
-                In no event shall BookDis, nor its directors, employees,
-                partners, agents, suppliers, or affiliates, be liable for any
-                indirect, incidental, punitive, consequential, or similar
-                damages.{"\n\n"}
-                <Text style={styles.boldText}>8. Changes to Terms{"\n"}</Text>
-                We reserve the right to modify these terms at any time. We will
-                notify users of any changes by posting the new terms on this
-                page.{"\n\n"}
-                <Text style={styles.boldText}>
-                  9. Contact Information{"\n"}
-                </Text>
-                If you have any questions about these Terms & Conditions, please
-                contact us at support@bookdis.com.
+            <ScrollView style={styles.termsContent}>
+              <Text style={styles.termsContentText}>
+                By creating a merchant account, you agree to our terms of service...
               </Text>
             </ScrollView>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.acceptButton}
-                onPress={handleAcceptTerms}
-              >
-                <Text style={styles.acceptButtonText}>Accept</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.acceptButton}
+              onPress={handleAcceptTerms}
+            >
+              <Text style={styles.acceptButtonText}>Accept Terms</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
       <ErrorModal
         visible={showErrorModal}
-        title="Login Failed"
+        title="Registration Failed"
         message={error}
         buttonText="Try Again"
         onClose={closeErrorModal}
         iconColor="#ff4757"
-        button
-        Color="#ff4757"
+        buttonColor="#ff4757"
       />
 
       <SuccessModal
@@ -520,235 +482,140 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
   },
-
-  keyboardAvoidingView: {
+  container: {
     flex: 1,
   },
-
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 30,
   },
-
-  container: {
+  safeArea: {
     flex: 1,
     paddingHorizontal: 20,
   },
-
-  back: {
-    paddingHorizontal: 20,
+  backButton: {
+    paddingVertical: 10,
+    alignSelf: 'flex-start',
   },
-
   title: {
-    fontSize: 35,
+    fontSize: 28,
     color: "#fff",
-    fontFamily: "Roboto_800ExtraBold",
-    paddingHorizontal: 20,
-  },
-
-  signIn: {
-    flexDirection: "row",
+    fontWeight: "800",
+    marginTop: 10,
     marginBottom: 10,
-    paddingHorizontal: 20,
   },
-
+  signInContainer: {
+    flexDirection: "row",
+    marginBottom: 20,
+  },
   signInText: {
     fontSize: 16,
-    fontFamily: "Roboto_800Regular",
     color: "#AACBFD",
   },
-
   signInLink: {
     fontSize: 16,
-    fontFamily: "Roboto_800Regular",
     color: "#AACBFD",
     textDecorationLine: "underline",
   },
-
   form: {
-    marginTop: 30,
-    width: "100%",
-    maxWidth: 400,
-    alignItems: "center",
-    paddingHorizontal: 20,
-    gap: 8,
+    flex: 1,
+    gap: 15,
   },
-
   inputContainer: {
     backgroundColor: "#fff",
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#4B1AA9",
-    marginBottom: 7,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    width: "100%",
-    height: 70,
-    position: "relative",
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
   },
-
-  gradientBorderContainer: {
-    borderRadius: 15,
-    padding: 1,
-    width: "100%",
-    height: 70,
-  },
-
-  innerInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: "100%",
-    width: "100%", // <-- ensure it fills the gradient wrapper
-    position: "relative", // label is absolutely positioned relative to this
-  },
-
   label: {
-    position: "absolute",
-    top: 8,
-    left: 16,
-    fontSize: 14,
-    color: "#A397CF",
-    fontFamily: "Roboto_400Regular",
-    zIndex: 2,
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 5,
   },
-
   input: {
-    flex: 1, // <-- this is the key: make input take remaining horizontal space
     fontSize: 16,
     color: "#000",
-    height: "100%",
-    paddingTop: 22, // leave room for the floating label
-    paddingLeft: 0, // inner container already has horizontal padding
+    paddingVertical: 5,
   },
-
+  dateInput: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 5,
+  },
+  dateText: {
+    fontSize: 16,
+    color: "#000",
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   eyeButton: {
-    position: "absolute",
-    right: 16,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 8,
+    padding: 5,
   },
-
   checkboxContainer: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    marginTop: 5,
-    marginBottom: 10,
+    marginTop: 10,
   },
-
   checkbox: {
-    width: 21,
-    height: 21,
+    width: 20,
+    height: 20,
     borderWidth: 2,
     borderColor: "#B13BFF",
     backgroundColor: "#fff",
-    borderRadius: 5,
-    borderWidth: 1,
+    borderRadius: 4,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
   },
-
   checkedBox: {
-    width: 21,
-    height: 21,
-    borderWidth: 2,
-    borderColor: "#B13BFF",
-    backgroundColor: "transparent",
-    borderRadius: 5,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
+    backgroundColor: "#B13BFF",
   },
-
   checkmark: {
-    color: "#f75c3c",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-
-  termsTextContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    flex: 1,
-  },
-
-  checkboxLabel: {
     color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "bold",
+    fontSize: 12,
   },
-
-  seeMoreText: {
+  termsText: {
     color: "#FDD6D1",
     fontSize: 14,
-    fontWeight: "600",
     textDecorationLine: "underline",
   },
-
-  buttonWrapper: {
-    borderRadius: 8,
-    overflow: "hidden", // ensures gradient respects border radius
-    marginTop: 10,
-    marginBottom: 40,
-    width: "100%",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  button: {
-     height: 60,
-  justifyContent: "center",
+  submitButton: {
+    backgroundColor: "#5C0AE4",
+    borderRadius: 10,
+    paddingVertical: 15,
     alignItems: "center",
-    borderRadius: 15,
+    marginTop: 20,
   },
-
-  buttonText: {
-    fontFamily: "Roboto_600SemiBold",
-    fontSize: 16,
-    color: "#fff",
-    fontWeight: "500",
-  },
-
   disabledButton: {
-    backgroundColor: "#fff",
-    opacity: 0.4,
+    opacity: 0.5,
   },
-
-  disabledButtonText: {
+  submitButtonText: {
     color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
-
-  // Terms Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
   },
-
-  termsModalContainer: {
+  datePickerContainer: {
     backgroundColor: "#fff",
-    borderRadius: 20,
+    borderRadius: 15,
     width: "90%",
-    height: "75%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    maxHeight: "50%",
   },
-
+  termsModal: {
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    width: "90%",
+    maxHeight: "70%",
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -757,77 +624,45 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
-
   modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2c3e50",
-    flex: 1,
-  },
-
-  closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#f8f9fa",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  closeButtonText: {
     fontSize: 18,
-    color: "#6c757d",
-    fontWeight: "bold",
+    fontWeight: "600",
+    color: "#000",
   },
-
-  termsContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  closeButton: {
+    fontSize: 24,
+    color: "#666",
   },
-
-  termsText: {
-    fontSize: 14,
-    color: "#495057",
-    lineHeight: 20,
-    textAlign: "justify",
-  },
-
-  boldText: {
-    fontWeight: "bold",
-    color: "#2c3e50",
-  },
-
-  modalButtons: {
-    flexDirection: "row",
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-    gap: 10,
-  },
-
-  declineButton: {
-    flex: 1,
-    paddingVertical: 12,
+  doneButton: {
+    backgroundColor: "#5C0AE4",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: "#6c757d",
-    alignItems: "center",
   },
-
-  declineButtonText: {
+  doneButtonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
   },
-
+  datePicker: {
+    backgroundColor: "#fff",
+  },
+  termsContent: {
+    padding: 20,
+    maxHeight: 300,
+  },
+  termsContentText: {
+    fontSize: 14,
+    color: "#333",
+    lineHeight: 20,
+  },
   acceptButton: {
-    flex: 1,
+    backgroundColor: "#5C0AE4",
+    margin: 20,
     paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: "#f75c3c",
     alignItems: "center",
   },
-
   acceptButtonText: {
     color: "#fff",
     fontSize: 16,

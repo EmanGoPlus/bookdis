@@ -1,101 +1,127 @@
 import db from "../db/config.js";
-import { claimedPromos, promos } from "../db/schema.js";
+import {
+  claimedPromos,
+  promos,
+  customerMemberships,
+  businesses,
+} from "../db/schema.js";
 import { nanoid } from "nanoid";
-import { eq } from "drizzle-orm"; // <-- add this
-
+import crypto from "crypto";
+import { eq, and, lte, gte, count } from "drizzle-orm";
 
 const promoModel = {
+
   async createPromo(data) {
-    try {
-      // Build the insert object, only including defined values
-      const insertData = {
-        businessId: data.businessId,
-        title: data.title,
-        description: data.description,
-        discountType: data.discountType,
-        discountValue: data.discountValue,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-      };
-
-      // Only add optional fields if they have values
-      if (data.conditions) {
-        insertData.conditions = JSON.stringify(data.conditions);
+    let eligibleMemberships = null;
+    if (data.eligibleMemberships) {
+      if (typeof data.eligibleMemberships === "string") {
+        const trimmed = data.eligibleMemberships.trim();
+        try {
+          const parsed = JSON.parse(trimmed);
+          eligibleMemberships = JSON.stringify(parsed);
+        } catch (e) {
+          eligibleMemberships = JSON.stringify([trimmed]);
+        }
+      } else if (Array.isArray(data.eligibleMemberships)) {
+        eligibleMemberships = JSON.stringify(data.eligibleMemberships);
       }
-
-      if (data.validDays && data.validDays.length > 0) {
-        insertData.validDays = JSON.stringify(data.validDays);
-      }
-
-      if (data.maxRedemptions !== undefined && data.maxRedemptions !== null) {
-        insertData.maxRedemptions = data.maxRedemptions;
-      }
-
-      if (
-        data.maxRedemptionsPerUser !== undefined &&
-        data.maxRedemptionsPerUser !== null
-      ) {
-        insertData.maxRedemptionsPerUser = data.maxRedemptionsPerUser;
-      }
-
-      if (data.cooldownHours !== undefined && data.cooldownHours !== null) {
-        insertData.cooldownHours = data.cooldownHours;
-      }
-
-      if (data.eligibleMemberships && data.eligibleMemberships.length > 0) {
-        insertData.eligibleMemberships = JSON.stringify(
-          data.eligibleMemberships
-        );
-      }
-
-      console.log("Final insert data:", insertData);
-
-      const result = await db.insert(promos).values(insertData).returning();
-
-      return result[0];
-    } catch (error) {
-      console.error("Database insert error:", error);
-      throw error;
     }
+
+    const insertData = {
+      businessId: data.businessId,
+      title: data.title,
+      description: data.description,
+      promoType: data.promoType,
+      startDate: new Date(data.startDate),
+      endDate: new Date(data.endDate),
+      imageUrl: data.imageUrl || null,
+      maxClaims: data.maxClaims ?? 0,
+      maxClaimsPerUser: data.maxClaimsPerUser ?? 0,
+      eligibleMemberships,
+      isActive: true,
+    };
+
+    const result = await db.insert(promos).values(insertData).returning();
+    return result[0];
   },
 
-  async getPromos() {
-    const result = await db.select().from(promos);
-    return result;
+
+  async getAvailablePromos() {
+    const now = new Date();
+
+    return await db
+      .select({
+        promoId: promos.id,
+        title: promos.title,
+        description: promos.description,
+        imageUrl: promos.imageUrl,
+        startDate: promos.startDate,
+        endDate: promos.endDate,
+        businessId: businesses.id,
+        businessName: businesses.businessName,
+        logo: businesses.logo,
+      })
+      .from(promos)
+      .innerJoin(businesses, eq(promos.businessId, businesses.id))
+      .where(
+        and(
+          eq(promos.isActive, true),
+          lte(promos.startDate, now),
+          gte(promos.endDate, now)
+        )
+      );
   },
 
-  async claimPromo({ promoId, customerId, membershipLevel = null }) {
-    const [promoDetails] = await db
+  async getMembership(customerId, businessId) {
+    const result = await db
+      .select()
+      .from(customerMemberships)
+      .where(
+        and(
+          eq(customerMemberships.customerId, customerId),
+          eq(customerMemberships.businessId, businessId),
+          eq(customerMemberships.isActive, true)
+        )
+      )
+      .limit(1);
+    
+    return result[0];
+  },
+
+
+  async getClaimCount(promoId) {
+    return await db
+      .select({ count: count() })
+      .from(claimedPromos)
+      .where(eq(claimedPromos.promoId, promoId));
+  },
+
+
+  async getUserClaimCount(promoId, customerId) {
+    return await db
+      .select({ count: count() })
+      .from(claimedPromos)
+      .where(
+        and(
+          eq(claimedPromos.promoId, promoId),
+          eq(claimedPromos.customerId, customerId)
+        )
+      );
+  },
+
+
+  async insertClaim(values) {
+    return await db.insert(claimedPromos).values(values).returning();
+  },
+
+  async getPromoById(promoId) {
+    const result = await db
       .select()
       .from(promos)
       .where(eq(promos.id, promoId))
       .limit(1);
 
-    const qrCode = JSON.stringify({
-      promoId,
-      customerId,
-      code: `PROMO_${nanoid(10)}`,
-      title: promoDetails?.title,
-      description: promoDetails?.description,
-      discount: promoDetails?.discount,
-      validUntil: promoDetails?.validUntil,
-    });
-
-    const [result] = await db
-      .insert(claimedPromos)
-      .values({
-        promoId,
-        customerId,
-        qrCode,
-        membershipLevel,
-      })
-      .returning();
-
-    return result;
-  },
-
-  async getPromoById(promoId) {
-    return db.select().from(promos).where(eq(promos.id, promoId)).limit(1);
+    return result[0];
   },
 };
 

@@ -30,7 +30,6 @@ export default function Profile({ navigation }) {
 
   if (!fontsLoaded) return null;
 
-  // Handle case where no business is selected (mainly for merchants)
   if (!hasSelectedBusiness()) {
     return (
       <LinearGradient
@@ -54,7 +53,6 @@ export default function Profile({ navigation }) {
     );
   }
 
-  // Extract business data from context
   const {
     businessName,
     logo,
@@ -72,7 +70,6 @@ export default function Profile({ navigation }) {
     id: businessId
   } = business;
 
-  // Debug: Log the logo URL to see what's being constructed
   const logoUrl = logo ? `${API_BASE_URL}/${logo}` : null;
   console.log("🖼️ Logo URL:", logoUrl);
 
@@ -141,7 +138,6 @@ export default function Profile({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Profile Section */}
           <View style={styles.profileSection}>
             <View style={styles.logoContainer}>
               <View style={styles.logoWrapper}>
@@ -175,14 +171,12 @@ export default function Profile({ navigation }) {
               <Text style={styles.businessSubtitle}>
                 {verificationStatus ? "Verified ✅" : "Not Verified"}
               </Text>
-              {/* Show user role info */}
               <Text style={styles.userRoleText}>
                 Logged in as: {userRole === "merchant" ? "Owner" : "Employee"}
               </Text>
             </View>
           </View>
 
-          {/* Profile Details */}
           <View style={styles.detailsContainer}>
             <ProfileCard
               title="Business Type"
@@ -213,8 +207,6 @@ export default function Profile({ navigation }) {
               icon="✔️"
             />
           </View>
-
-          {/* Action Buttons */}
           <View style={styles.actionContainer}>
             <ActionButton
               title="💳 View Credits & History"
@@ -240,7 +232,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // No Business State
   noBusiness: {
     flex: 1,
     justifyContent: "center",
@@ -273,7 +264,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // Header Styles
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -315,13 +305,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  // Scroll Content
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 30,
   },
 
-  // Profile Section
   profileSection: {
     alignItems: "center",
     paddingVertical: 24,
@@ -419,7 +407,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  // Action Container
   actionContainer: {
     marginBottom: 20,
   },

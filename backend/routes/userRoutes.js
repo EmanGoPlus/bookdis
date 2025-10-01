@@ -3,6 +3,7 @@ import businessController from "../controllers/businessController.js";
 import creditController from "../controllers/creditController.js";
 import permissionController from "../controllers/permissionController.js";
 import promoController from "../controllers/promoController.js";
+import membershipController from "../controllers/membershipController.js";
 import authenticateToken from "../middlewares/auth.js";
 import fastifyMultipart from "@fastify/multipart";
 
@@ -54,7 +55,6 @@ async function userRoutes(fastify, options) {
   });
 
   fastify.get(
-
     "/business/:businessId",
     { preHandler: authenticateToken },
     businessController.getBusinessById
@@ -84,20 +84,45 @@ async function userRoutes(fastify, options) {
   });
 
   //=============================PROMOS=============================
+
   fastify.post("/business/create-promo", {
     preHandler: authenticateToken,
     handler: promoController.createPromo,
   });
 
-  fastify.get("/customer/promos", promoController.getPromos);
+  fastify.get("/business/available-promos", {
+    preHandler: authenticateToken,
+    handler: promoController.getAvailablePromos,
+  });
+
+  fastify.get("/customer/claim-promo/:id", {
+    preHandler: authenticateToken,
+    handler: promoController.claimPromo,
+  });
+
+  fastify.get("/customer/promos", {
+    preHandler: authenticateToken,
+    handler: promoController.getPromos,
+  });
 
   fastify.post("/customer/claim-promo/:id", {
+    preHandler: authenticateToken,
     handler: promoController.claimPromo,
   });
 
   fastify.get("/customer/promo/:id", {
     handler: promoController.getPromoById,
   });
+  //=============================MEMBERSHIP=============================
+  fastify.post("/customer/membership", {
+    preHandler: authenticateToken,
+    handler: membershipController.createMembership,
+  });
+
+  fastify.put(
+    "/api/membership/deactivate",
+    membershipController.deactivateMembership
+  );
 }
 
 export default userRoutes;

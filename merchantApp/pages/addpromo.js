@@ -11,11 +11,14 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  Platform,
 } from "react-native";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   useFonts,
   Roboto_800ExtraBold,
@@ -32,23 +35,21 @@ export default function AddPromo({ navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [showPromoForm, setShowPromoForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
+  const [startDateObj, setStartDateObj] = useState(new Date());
+  const [endDateObj, setEndDateObj] = useState(new Date());
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    discountType: "percentage",
-    discountValue: "",
+    promoType: "b1s1",
+    imageUrl: "",
     startDate: "",
     endDate: "",
-    maxRedemptions: "",
-    maxRedemptionsPerUser: "",
-    cooldownHours: "",
-    validDays: [],
+    maxClaims: "",
+    maxClaimsPerUser: "",
     eligibleMemberships: [],
-    conditions: {
-      minPurchase: "",
-      applicableCategories: "",
-      excludedItems: "",
-    }
   });
 
   const [fontsLoaded] = useFonts({
@@ -57,9 +58,19 @@ export default function AddPromo({ navigation }) {
     Roboto_400Regular,
   });
 
-  const discountTypes = [
-    { label: "Percentage (%)", value: "percentage" },
-    { label: "Fixed Amount (₱)", value: "fixed" },
+  const promoTypes = [
+    {
+      label: "Buy 1 Share 1",
+      value: "b1s1",
+      description:
+        "Customer buys 1 item and can share 1 free item with a friend",
+    },
+    {
+      label: "Share Only",
+      value: "share",
+      description:
+        "Customer can share this promo with friends (no purchase required)",
+    },
   ];
 
   const membershipLevels = [
@@ -67,16 +78,6 @@ export default function AddPromo({ navigation }) {
     { label: "Gold", value: "gold" },
     { label: "Premium", value: "premium" },
     { label: "VIP", value: "vip" },
-  ];
-
-  const dayOptions = [
-    { label: "Monday", value: 1 },
-    { label: "Tuesday", value: 2 },
-    { label: "Wednesday", value: 3 },
-    { label: "Thursday", value: 4 },
-    { label: "Friday", value: 5 },
-    { label: "Saturday", value: 6 },
-    { label: "Sunday", value: 0 },
   ];
 
   useEffect(() => {
@@ -131,10 +132,12 @@ export default function AddPromo({ navigation }) {
 
       setSelectedBusiness(businessDetails);
       setModalVisible(false);
-      setShowPromoForm(true); // Show the promo form
-      
-      console.log("🏢 Business selected for promo creation:", businessDetails.businessName);
+      setShowPromoForm(true);
 
+      console.log(
+        "🏢 Business selected for promo creation:",
+        businessDetails.businessName
+      );
     } catch (err) {
       console.error("❌ Error fetching business details:", err.message);
       Alert.alert("Error", "Failed to load business details");
@@ -151,34 +154,19 @@ export default function AddPromo({ navigation }) {
   );
 
   const updateFormData = (field, value) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const toggleArrayItem = (array, item) => {
-    const currentArray = formData[array] || [];
-    const exists = currentArray.includes(item);
-    
-    updateFormData(array, 
-      exists 
-        ? currentArray.filter(i => i !== item)
-        : [...currentArray, item]
+  const toggleMembershipLevel = (level) => {
+    const currentLevels = formData.eligibleMemberships || [];
+    const exists = currentLevels.includes(level);
+
+    updateFormData(
+      "eligibleMemberships",
+      exists
+        ? currentLevels.filter((l) => l !== level)
+        : [...currentLevels, level]
     );
-  };
-
-  const formatDateForAPI = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString + "T00:00:00Z").toISOString();
   };
 
   const validateForm = () => {
@@ -192,11 +180,6 @@ export default function AddPromo({ navigation }) {
       return false;
     }
 
-    if (!formData.discountValue || isNaN(formData.discountValue)) {
-      Alert.alert("Error", "Valid discount value is required");
-      return false;
-    }
-
     if (!formData.startDate) {
       Alert.alert("Error", "Start date is required");
       return false;
@@ -207,7 +190,22 @@ export default function AddPromo({ navigation }) {
       return false;
     }
 
-    if (new Date(formData.startDate) >= new Date(formData.endDate)) {
+    const startDate = new Date(formData.startDate);
+    const endDate = new Date(formData.endDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      Alert.alert("Error", "Please enter valid dates in YYYY-MM-DD format");
+      return false;
+    }
+
+    if (startDate < today) {
+      Alert.alert("Error", "Start date cannot be in the past");
+      return false;
+    }
+
+    if (endDate <= startDate) {
       Alert.alert("Error", "End date must be after start date");
       return false;
     }
@@ -217,7 +215,6 @@ export default function AddPromo({ navigation }) {
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
-
     setLoading(true);
 
     try {
@@ -228,94 +225,100 @@ export default function AddPromo({ navigation }) {
         return;
       }
 
-      // Prepare the payload
-      const payload = {
-        businessId: selectedBusiness.id,
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        discountType: formData.discountType,
-        discountValue: parseInt(formData.discountValue),
-        startDate: formatDateForAPI(formData.startDate),
-        endDate: formatDateForAPI(formData.endDate),
-      };
+      const formDataObj = new FormData();
+      formDataObj.append("businessId", selectedBusiness.id.toString());
+      formDataObj.append("title", formData.title.trim());
+      formDataObj.append("description", formData.description.trim());
+      formDataObj.append("promoType", formData.promoType);
+      formDataObj.append(
+        "startDate",
+        new Date(formData.startDate).toISOString()
+      );
+      formDataObj.append("endDate", new Date(formData.endDate).toISOString());
 
-      // Add optional fields only if they have values
-      if (formData.maxRedemptions) {
-        payload.maxRedemptions = parseInt(formData.maxRedemptions);
+      if (formData.maxClaims) {
+        formDataObj.append("maxClaims", formData.maxClaims.toString());
       }
-
-      if (formData.maxRedemptionsPerUser) {
-        payload.maxRedemptionsPerUser = parseInt(formData.maxRedemptionsPerUser);
+      if (formData.maxClaimsPerUser) {
+        formDataObj.append(
+          "maxClaimsPerUser",
+          formData.maxClaimsPerUser.toString()
+        );
       }
-
-      if (formData.cooldownHours) {
-        payload.cooldownHours = parseInt(formData.cooldownHours);
-      }
-
-      if (formData.validDays && formData.validDays.length > 0) {
-        payload.validDays = formData.validDays;
-      }
-
-      if (formData.eligibleMemberships && formData.eligibleMemberships.length > 0) {
-        payload.eligibleMemberships = formData.eligibleMemberships;
+      if (formData.eligibleMemberships.length > 0) {
+        formDataObj.append(
+          "eligibleMemberships",
+          formData.eligibleMemberships.join(",")
+        );
       }
 
-      // Add conditions if any are filled
-      const conditions = {};
-      if (formData.conditions.minPurchase) {
-        conditions.minPurchase = parseInt(formData.conditions.minPurchase);
+      // Add the image file if selected
+      if (formData.imageUrl) {
+        const uriParts = formData.imageUrl.split(".");
+        const fileType = uriParts[uriParts.length - 1];
+        formDataObj.append("image", {
+          uri: formData.imageUrl,
+          name: `promo.${fileType}`,
+          type: `image/${fileType}`,
+        });
       }
-      if (formData.conditions.applicableCategories) {
-        conditions.applicableCategories = formData.conditions.applicableCategories.split(',').map(s => s.trim());
-      }
-      if (formData.conditions.excludedItems) {
-        conditions.excludedItems = formData.conditions.excludedItems.split(',').map(s => s.trim());
-      }
-
-      if (Object.keys(conditions).length > 0) {
-        payload.conditions = conditions;
-      }
-
-      console.log("Sending payload:", payload);
 
       const response = await axios.post(
-        `${API_BASE_URL}/api/user/business/create-promo`, 
-        payload,
+        `${API_BASE_URL}/api/user/business/create-promo`,
+        formDataObj,
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "multipart/form-data",
           },
         }
       );
 
-      console.log("Promo created:", response.data);
+      console.log("✅ Promo created:", response.data);
 
-      Alert.alert(
-        "Success!",
-        "Promo has been created successfully",
-        [
-          {
-            text: "OK",
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
-
+      Alert.alert("Success!", "Promo has been created successfully", [
+        { text: "OK", onPress: () => navigation.goBack() },
+      ]);
     } catch (error) {
-      console.error("Error creating promo:", error);
-      
+      console.error("❌ Error creating promo:", error);
       let errorMessage = "Failed to create promo";
       if (error.response) {
         errorMessage = error.response.data.message || errorMessage;
-        console.error("API Error:", error.response.data);
       }
-
       Alert.alert("Error", errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      updateFormData("imageUrl", result.assets[0].uri);
+    }
+  };
+
+  const handleStartDateChange = (event, selectedDate) => {
+  setShowStartPicker(false);
+  if (selectedDate) {
+    setStartDateObj(selectedDate);
+    updateFormData("startDate", selectedDate.toISOString().split("T")[0]); // store YYYY-MM-DD
+  }
+};
+
+const handleEndDateChange = (event, selectedDate) => {
+  setShowEndPicker(false);
+  if (selectedDate) {
+    setEndDateObj(selectedDate);
+    updateFormData("endDate", selectedDate.toISOString().split("T")[0]);
+  }
+};
+
 
   if (!fontsLoaded) return null;
 
@@ -336,7 +339,9 @@ export default function AddPromo({ navigation }) {
         <SafeAreaView style={styles.container}>
           <View style={styles.selectionHeader}>
             <Text style={styles.selectionTitle}>Create Promo</Text>
-            <Text style={styles.selectionSubtitle}>Select a business to create promo for</Text>
+            <Text style={styles.selectionSubtitle}>
+              Select a business to create promo for
+            </Text>
           </View>
 
           <View style={styles.form}>
@@ -349,8 +354,8 @@ export default function AddPromo({ navigation }) {
                 {selectedBusiness
                   ? `Selected: ${selectedBusiness.businessName}`
                   : businesses.length > 0
-                  ? "Select Business"
-                  : "No Businesses Available"}
+                    ? "Select Business"
+                    : "No Businesses Available"}
               </Text>
             </TouchableOpacity>
 
@@ -416,7 +421,10 @@ export default function AddPromo({ navigation }) {
         backgroundColor="transparent"
       />
       <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.header}>
             <Text style={styles.title}>Create New Promo</Text>
             <Text style={styles.businessName}>
@@ -433,12 +441,12 @@ export default function AddPromo({ navigation }) {
           <View style={styles.formContainer}>
             {/* Title */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Title *</Text>
+              <Text style={styles.label}>Promo Title *</Text>
               <TextInput
                 style={styles.input}
                 value={formData.title}
-                onChangeText={(value) => updateFormData('title', value)}
-                placeholder="e.g., Flash Sale - 50% Off"
+                onChangeText={(value) => updateFormData("title", value)}
+                placeholder="e.g., Buy 1 Coffee, Share 1 Free!"
                 placeholderTextColor="#9CA3AF"
                 maxLength={100}
               />
@@ -450,8 +458,8 @@ export default function AddPromo({ navigation }) {
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={formData.description}
-                onChangeText={(value) => updateFormData('description', value)}
-                placeholder="Describe your promo..."
+                onChangeText={(value) => updateFormData("description", value)}
+                placeholder="Describe your promo offer..."
                 placeholderTextColor="#9CA3AF"
                 multiline
                 numberOfLines={3}
@@ -459,118 +467,165 @@ export default function AddPromo({ navigation }) {
               />
             </View>
 
-            {/* Discount Type */}
+            {/* Promo Type */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Discount Type *</Text>
-              <View style={styles.radioGroup}>
-                {discountTypes.map((type) => (
+              <Text style={styles.label}>Promo Type *</Text>
+              <View style={styles.promoTypeContainer}>
+                {promoTypes.map((type) => (
                   <TouchableOpacity
                     key={type.value}
                     style={[
-                      styles.radioItem,
-                      formData.discountType === type.value && styles.radioItemSelected
+                      styles.promoTypeItem,
+                      formData.promoType === type.value &&
+                        styles.promoTypeItemSelected,
                     ]}
-                    onPress={() => updateFormData('discountType', type.value)}
+                    onPress={() => updateFormData("promoType", type.value)}
                   >
-                    <Text style={[
-                      styles.radioText,
-                      formData.discountType === type.value && styles.radioTextSelected
-                    ]}>
+                    <Text
+                      style={[
+                        styles.promoTypeTitle,
+                        formData.promoType === type.value &&
+                          styles.promoTypeTextSelected,
+                      ]}
+                    >
                       {type.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.promoTypeDesc,
+                        formData.promoType === type.value &&
+                          styles.promoTypeDescSelected,
+                      ]}
+                    >
+                      {type.description}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            {/* Discount Value */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                Discount Value * ({formData.discountType === 'percentage' ? '%' : '₱'})
+            {/* Image URL */}
+            <TouchableOpacity style={styles.selectButton} onPress={pickImage}>
+              <Text style={styles.selectButtonText}>
+                {formData.imageUrl ? "Change Promo Image" : "Pick Promo Image"}
               </Text>
-              <TextInput
-                style={styles.input}
-                value={formData.discountValue}
-                onChangeText={(value) => updateFormData('discountValue', value)}
-                placeholder={formData.discountType === 'percentage' ? "e.g., 20" : "e.g., 500"}
-                placeholderTextColor="#9CA3AF"
-                keyboardType="numeric"
-              />
-            </View>
+            </TouchableOpacity>
+
+            {formData.imageUrl ? (
+              <Text style={styles.helperText}>
+                Selected: {formData.imageUrl.split("/").pop()}
+              </Text>
+            ) : null}
 
             {/* Date Range */}
-            <View style={styles.row}>
-              <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={styles.label}>Start Date *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.startDate}
-                  onChangeText={(value) => updateFormData('startDate', value)}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
+           <View style={styles.row}>
+  <View style={[styles.inputGroup, styles.halfWidth]}>
+    <Text style={styles.label}>Start Date *</Text>
+    <TouchableOpacity
+      style={styles.input}
+      onPress={() => setShowStartPicker(true)}
+    >
+      <Text>
+        {formData.startDate
+          ? formData.startDate
+          : "Select start date"}
+      </Text>
+    </TouchableOpacity>
+    {showStartPicker && (
+      <DateTimePicker
+        value={startDateObj}
+        mode="date"
+        display={Platform.OS === "ios" ? "spinner" : "default"}
+        onChange={handleStartDateChange}
+      />
+    )}
+  </View>
 
-              <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={styles.label}>End Date *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.endDate}
-                  onChangeText={(value) => updateFormData('endDate', value)}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-            </View>
+  <View style={[styles.inputGroup, styles.halfWidth]}>
+    <Text style={styles.label}>End Date *</Text>
+    <TouchableOpacity
+      style={styles.input}
+      onPress={() => setShowEndPicker(true)}
+    >
+      <Text>
+        {formData.endDate
+          ? formData.endDate
+          : "Select end date"}
+      </Text>
+    </TouchableOpacity>
+    {showEndPicker && (
+      <DateTimePicker
+        value={endDateObj}
+        mode="date"
+        display={Platform.OS === "ios" ? "spinner" : "default"}
+        onChange={handleEndDateChange}
+      />
+    )}
+  </View>
+</View>
 
-            {/* Optional Fields */}
+
+            {/* Optional Settings */}
             <Text style={styles.sectionTitle}>Optional Settings</Text>
 
-            {/* Usage Limits */}
+            {/* Claim Limits */}
             <View style={styles.row}>
               <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={styles.label}>Max Redemptions</Text>
+                <Text style={styles.label}>Max Claims Total</Text>
                 <TextInput
                   style={styles.input}
-                  value={formData.maxRedemptions}
-                  onChangeText={(value) => updateFormData('maxRedemptions', value)}
+                  value={formData.maxClaims}
+                  onChangeText={(value) => updateFormData("maxClaims", value)}
                   placeholder="e.g., 100"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="numeric"
                 />
+                <Text style={styles.helperText}>Total claims allowed</Text>
               </View>
 
               <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={styles.label}>Max Per User</Text>
+                <Text style={styles.label}>Max Claims Per User</Text>
                 <TextInput
                   style={styles.input}
-                  value={formData.maxRedemptionsPerUser}
-                  onChangeText={(value) => updateFormData('maxRedemptionsPerUser', value)}
+                  value={formData.maxClaimsPerUser}
+                  onChangeText={(value) =>
+                    updateFormData("maxClaimsPerUser", value)
+                  }
                   placeholder="e.g., 1"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="numeric"
                 />
+                <Text style={styles.helperText}>Per customer limit</Text>
               </View>
             </View>
 
-            {/* Valid Days */}
+            {/* Eligible Membership Levels */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Valid Days (optional)</Text>
+              <Text style={styles.label}>
+                Eligible Membership Levels (optional)
+              </Text>
+              <Text style={styles.helperText}>
+                Leave empty to allow all membership levels
+              </Text>
               <View style={styles.checkboxGroup}>
-                {dayOptions.map((day) => (
+                {membershipLevels.map((level) => (
                   <TouchableOpacity
-                    key={day.value}
+                    key={level.value}
                     style={[
                       styles.checkboxItem,
-                      formData.validDays.includes(day.value) && styles.checkboxItemSelected
+                      formData.eligibleMemberships.includes(level.value) &&
+                        styles.checkboxItemSelected,
                     ]}
-                    onPress={() => toggleArrayItem('validDays', day.value)}
+                    onPress={() => toggleMembershipLevel(level.value)}
                   >
-                    <Text style={[
-                      styles.checkboxText,
-                      formData.validDays.includes(day.value) && styles.checkboxTextSelected
-                    ]}>
-                      {day.label}
+                    <Text
+                      style={[
+                        styles.checkboxText,
+                        formData.eligibleMemberships.includes(level.value) &&
+                          styles.checkboxTextSelected,
+                      ]}
+                    >
+                      {level.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -579,12 +634,17 @@ export default function AddPromo({ navigation }) {
 
             {/* Submit Button */}
             <TouchableOpacity
-              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton,
+                loading && styles.submitButtonDisabled,
+              ]}
               onPress={handleSubmit}
               disabled={loading}
             >
               <LinearGradient
-                colors={loading ? ["#9CA3AF", "#6B7280"] : ["#FFFFFF", "#F3F4F6"]}
+                colors={
+                  loading ? ["#9CA3AF", "#6B7280"] : ["#FFFFFF", "#F3F4F6"]
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.submitButtonGradient}
@@ -592,7 +652,11 @@ export default function AddPromo({ navigation }) {
                 {loading ? (
                   <ActivityIndicator size="small" color="#4F46E5" />
                 ) : (
-                  <Text style={styles.submitButtonText}>Create Promo</Text>
+                  <Text style={styles.submitButtonText}>
+                    Create{" "}
+                    {formData.promoType === "b1s1" ? "Buy 1 Share 1" : "Share"}{" "}
+                    Promo
+                  </Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -602,7 +666,9 @@ export default function AddPromo({ navigation }) {
               style={styles.backButton}
               onPress={() => setShowPromoForm(false)}
             >
-              <Text style={styles.backButtonText}>Back to Business Selection</Text>
+              <Text style={styles.backButtonText}>
+                Back to Business Selection
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -720,42 +786,56 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: "top",
   },
-  radioGroup: {
-    flexDirection: "row",
-    gap: 10,
+  helperText: {
+    fontSize: 12,
+    fontFamily: "Roboto_400Regular",
+    color: "#6B7280",
+    marginTop: 4,
   },
-  radioItem: {
+  promoTypeContainer: {
+    gap: 12,
+  },
+  promoTypeItem: {
     backgroundColor: "#F9FAFB",
     borderWidth: 2,
     borderColor: "#E5E7EB",
-    borderRadius: 8,
-    padding: 12,
-    flex: 1,
-    alignItems: "center",
+    borderRadius: 12,
+    padding: 16,
   },
-  radioItemSelected: {
+  promoTypeItemSelected: {
     backgroundColor: "#EEF2FF",
     borderColor: "#4F46E5",
   },
-  radioText: {
-    fontSize: 14,
+  promoTypeTitle: {
+    fontSize: 16,
     fontFamily: "Roboto_600SemiBold",
-    color: "#6B7280",
+    color: "#374151",
+    marginBottom: 4,
   },
-  radioTextSelected: {
+  promoTypeDesc: {
+    fontSize: 14,
+    fontFamily: "Roboto_400Regular",
+    color: "#6B7280",
+    lineHeight: 20,
+  },
+  promoTypeTextSelected: {
     color: "#4F46E5",
+  },
+  promoTypeDescSelected: {
+    color: "#6366F1",
   },
   checkboxGroup: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+    marginTop: 8,
   },
   checkboxItem: {
     backgroundColor: "#F9FAFB",
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 6,
-    padding: 8,
+    padding: 10,
     minWidth: 80,
     alignItems: "center",
   },
@@ -786,7 +866,7 @@ const styles = StyleSheet.create({
     height: 65,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: '#8D4BFF',
+    borderColor: "#8D4BFF",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
@@ -817,9 +897,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   submitButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Roboto_600SemiBold",
     color: "#4F46E5",
+    textAlign: "center",
   },
   backButton: {
     alignItems: "center",
@@ -830,7 +911,6 @@ const styles = StyleSheet.create({
     fontFamily: "Roboto_400Regular",
     color: "#8D4BFF",
   },
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",

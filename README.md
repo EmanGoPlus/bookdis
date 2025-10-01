@@ -1,4 +1,4 @@
-# Fullstack Business Management Platform
+# Bookdis
 
 A multi-platform application stack for merchants, customers, and admins with a backend powered by Fastify and PostgreSQL.  
 This project includes:  
@@ -14,7 +14,7 @@ This project includes:
 - **Backend:** Node.js, Fastify  
 - **ORM:** Drizzle ORM  
 - **Database:** PostgreSQL
-- https://psgc.cloud/ for address api 
+- **https://psgc.cloud/** for address api 
 
 ---
 

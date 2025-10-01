@@ -22,7 +22,6 @@ async function generateCustomerCode() {
   return code;
 }
 
-
 const userModel = {
   async getUserByPhone(phone) {
     const result = await db
@@ -34,7 +33,6 @@ const userModel = {
   },
 
   async combinedLogin(identifier, password) {
-    // First try employee login (username-based)
     try {
       const employeeResult = await db
         .select()
@@ -56,7 +54,6 @@ const userModel = {
       console.error("Employee login attempt failed:", error);
     }
 
-    // If employee login fails, try merchant login (phone-based)
     try {
       const merchantResult = await db
         .select()
@@ -116,71 +113,77 @@ const userModel = {
     const result = await db
       .select()
       .from(customers)
-      .where(and(eq(customers.phone, phone), eq(customers.password, password)));
+      .where(eq(customers.phone, phone));
 
-    return result[0] || null;
+    const customer = result[0];
+    if (!customer) return null;
+
+    const isMatch = await bcrypt.compare(password, customer.password);
+    if (!isMatch) return null;
+
+    return customer;
   },
 
   async customerRegister(customerData) {
-    try {
-      const {
+    const {
+      profile,
+      firstName,
+      lastName,
+      email,
+      phone,
+      birthday,
+      password,
+      region,
+      province,
+      city,
+      barangay,
+      postalCode,
+      addressDetails,
+    } = customerData;
+
+    const customerCode = await generateCustomerCode();
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await db
+      .insert(customers)
+      .values({
+        customerCode,
+        profilePic: profile, // This matches the table column name
         firstName,
         lastName,
         email,
         phone,
-        password,
+        birthday,
+        password: hashedPassword,
         region,
         province,
         city,
         barangay,
         postalCode,
         addressDetails,
-      } = customerData;
+      })
+      .returning({
+        id: customers.id,
+        customerCode: customers.customerCode,
+        profilePic: customers.profilePic,
+        firstName: customers.firstName,
+        lastName: customers.lastName,
+        email: customers.email,
+        phone: customers.phone,
+        birthday: customers.birthday,
+        region: customers.region,
+        province: customers.province,
+        city: customers.city,
+        barangay: customers.barangay,
+        postalCode: customers.postalCode,
+        addressDetails: customers.addressDetails,
+      });
 
-           const customerCode = await generateCustomerCode();
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      const result = await db
-        .insert(customers)
-        .values({
-          customerCode,
-          firstName,
-          lastName,
-          email,
-          phone,
-          password: hashedPassword,
-          region,
-          province,
-          city,
-          barangay,
-          postalCode,
-          addressDetails,
-        })
-        .returning({
-          id: customers.id,
-          customerCode: customers.customerCode,
-          firstName: customers.firstName,
-          lastName: customers.lastName,
-          email: customers.email,
-          phone: customers.phone,
-          region: customers.region,
-          province: customers.province,
-          city: customers.city,
-          barangay: customers.baranggay,
-          postalCode: customers.postalCode,
-          addressDetails: customers.addressDetails,
-        });
-
-      if (!result || result.length === 0) {
-        throw new Error("Failed to insert customer - no data returned");
-      }
-
-      return result[0];
-    } catch (error) {
-      console.error("Database error in customerRegister:", error);
-      throw error;
+    if (!result || result.length === 0) {
+      throw new Error("Failed to insert customer - no data returned");
     }
+
+    return result[0];
   },
 
   async merchantRegister(

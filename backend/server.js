@@ -7,6 +7,7 @@ import { Server as IOServer } from "socket.io";
 import userRoutes from "./routes/userRoutes.js";
 import { pool } from "./db/config.js";
 
+
 // --- Create Fastify instance ---
 const fastify = Fastify({
   logger: {
@@ -16,6 +17,7 @@ const fastify = Fastify({
     },
   },
 });
+
 
 // --- Enable CORS ---
 await fastify.register(cors, {

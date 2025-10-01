@@ -24,7 +24,6 @@ const creditsController = {
         return reply.status(400).send({ error: "Invalid business ID" });
       }
 
-      // UPDATED: Use the new access check method
       const business = await creditModel.checkBusinessAccess(
         businessId,
         userId,

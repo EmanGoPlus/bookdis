@@ -29,7 +29,6 @@ const permissionController = {
     }
   },
 
-  // GET /api/permissions/check/:employeeId/:elementKey
   async checkElementVisibility(request, reply) {
     try {
       const { employeeId, elementKey } = request.params;

@@ -12,8 +12,7 @@ const authenticateToken = (req, reply, done) => {
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     
-
-    console.log("🔍 JWT Payload:", payload);
+    console.log("JWT Payload:", payload);
     
     req.user = { 
       id: payload.id || payload.userId, 
@@ -25,7 +24,7 @@ const authenticateToken = (req, reply, done) => {
     
     done();
   } catch (err) {
-    console.error("❌ JWT verification error:", err);
+    console.error("JWT verification error:", err);
     return reply.status(401).send({ error: 'Invalid token' });
   }
 };

@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, integer, boolean, timestamp, text } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, integer, boolean, timestamp, text, date } from "drizzle-orm/pg-core";
 
 // ----------------------
 // Merchants (owners)
@@ -36,13 +36,26 @@ export const employees = pgTable("tbl_employees", {
 
 export const customers = pgTable("tbl_customers", {
   id: serial("id").primaryKey(),
-  firstName: varchar("first_name", { length: 50 }),
-  lastName: varchar("last_name", { length: 50 }),
+  customerCode: varchar("customer_code", { length: 20 }).unique().notNull(),
+  profilePic: varchar("profile_path", { length: 255 }).notNull(),
+  firstName: varchar("first_name", { length: 50 }).notNull(),
+  lastName: varchar("last_name", { length: 50 }).notNull(),
   email: varchar("email", { length: 100 }).unique().notNull(),
   phone: varchar("phone", { length: 11 }).unique().notNull(),
+  birthday: date("birthday").notNull(),
   password: varchar("password").notNull(),
+  
+  // Address fields
+  region: varchar("region", { length: 50 }).notNull(),
+  province: varchar("province", { length: 50 }).notNull(),
+  city: varchar("city", { length: 50 }).notNull(),
+  barangay: varchar("barangay", { length: 100 }).notNull(),
+  postalCode: varchar("postal_code", { length: 10 }).notNull(),
+  addressDetails: text("address_details").notNull(),
+  
   role: varchar("role", { length: 50 }).default("customer"),
-  createdAt: timestamp("created_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
 });
 
 export const customerMemberships = pgTable("tbl_customer_memberships", {
@@ -189,34 +202,27 @@ export const products = pgTable("tbl_products", {
 // Promos
 // ----------------------
 
+// ================= PROMOS =================
+
 export const promos = pgTable("tbl_promos", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").references(() => businesses.id).notNull(),
 
-  // display
   title: varchar("title", { length: 100 }).notNull(),
   description: varchar("description", { length: 255 }),
 
-  // discount mechanics
-  discountType: varchar("discount_type", { length: 50 }).notNull(),
-  discountValue: integer("discount_value"),
-  conditions: text("conditions"),
+  promoType: varchar("promo_type", { length: 20 }).notNull(), // "b1s1" or "share"
 
-  // validity
+  imageUrl: varchar("image_url", { length: 500 }),
+
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
-  validDays: varchar("valid_days", { length: 50 }),
 
-  // usage control
-  maxRedemptions: integer("max_redemptions"),
-  maxRedemptionsPerUser: integer("max_redemptions_per_user"),
-  cooldownHours: integer("cooldown_hours"),
+  maxClaims: integer("max_claims"),
+  maxClaimsPerUser: integer("max_claims_per_user"),
 
-  // NEW: eligibility
-  eligibleMemberships: varchar("eligible_memberships", { length: 255 }), 
-  // e.g. "regular,gold,vip" or null = open to all
+  eligibleMemberships: varchar("eligible_memberships", { length: 255 }),
 
-  // status
   isActive: boolean("is_active").default(true),
 
   createdAt: timestamp("created_at").defaultNow(),
@@ -228,13 +234,28 @@ export const claimedPromos = pgTable("tbl_claimed_promos", {
   promoId: integer("promo_id").references(() => promos.id).notNull(),
   customerId: integer("customer_id").references(() => customers.id).notNull(),
 
-  // QR & usage tracking
   qrCode: varchar("qr_code", { length: 255 }).notNull(),
-  redeemedAt: timestamp("redeemed_at"),
-  isRedeemed: boolean("is_redeemed").default(false),
+  qrExpiresAt: timestamp("qr_expires_at").notNull(), // 24h from claim
 
-  // NEW: track membership at claim time
-  membershipLevel: varchar("membership_level", { length: 50 }),
+  isRedeemed: boolean("is_redeemed").default(false),
+  redeemedAt: timestamp("redeemed_at"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+
+export const sharedPromos = pgTable("tbl_shared_promos", {
+  id: serial("id").primaryKey(),
+  promoId: integer("promo_id").references(() => promos.id).notNull(),
+
+  fromCustomerId: integer("from_customer_id").references(() => customers.id).notNull(),
+  toCustomerId: integer("to_customer_id").references(() => customers.id).notNull(),
+
+  qrCode: varchar("qr_code", { length: 255 }).notNull(),
+
+  isRedeemed: boolean("is_redeemed").default(false),
+  redeemedBy: integer("redeemed_by").references(() => customers.id),
+  redeemedAt: timestamp("redeemed_at"),
 
   createdAt: timestamp("created_at").defaultNow(),
 });

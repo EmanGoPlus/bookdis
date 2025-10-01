@@ -184,7 +184,7 @@ const businessModel = {
           rejectedReason: null,
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(businessDocuments.businessId, businessId)) // ✅ Fixed: Use eq() function consistently
+        .where(eq(businessDocuments.businessId, businessId)) // Fixed: Use eq() function consistently
         .returning();
 
       if (!result || result.length === 0) {

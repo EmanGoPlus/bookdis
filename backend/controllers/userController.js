@@ -1,5 +1,7 @@
-import userModel from "../models/userModel.js";
+import db from "../db/config.js"; // Add this line
+import { customers } from "../db/schema.js";
 import businessModel from "../models/businessModel.js";
+import userModel from "../models/userModel.js";
 import jwt from "jsonwebtoken";
 import fs from "fs";
 import path from "path";
@@ -7,7 +9,7 @@ import util from "util";
 import crypto from "crypto";
 import { pipeline } from "stream";
 import bcrypt from "bcrypt";
-import { employees } from "../db/schema.js";
+import { eq, and } from "drizzle-orm";
 
 const pump = util.promisify(pipeline);
 
@@ -23,7 +25,6 @@ function generateRandomPassword(length = 5) {
 }
 
 const userController = {
-  
   async getAllUsers(request, reply) {
     try {
       const users = await userModel.getAllUsers();
@@ -38,7 +39,7 @@ const userController = {
 
   async combinedLogin(request, reply) {
     try {
-      const { username, password } = request.body; // Keep 'username' as the field name for consistency with your UI
+      const { username, password } = request.body;
 
       if (!username || !password) {
         return reply
@@ -54,7 +55,6 @@ const userController = {
 
       const { user, type } = loginResult;
 
-      // Create JWT token
       const tokenPayload = {
         id: user.id,
         role: user.role || type,
@@ -124,49 +124,55 @@ const userController = {
     }
   },
 
-  async customerLogin(request, reply) {
-    try {
+ async customerLogin(request, reply) {
+  try {
+    const { username, password } = request.body;
 
-      const {username, password} = request.body;
-
-      if (!username || !password) {
-         return reply.status(400).send({ error: "Missing fields" });
-      }
-
-      const customer = await userModel.costumerLogin(username, password);
-
-      if (!customer) {
-         return reply.status(401).send({ error: "User Not Found" });
-      }
-
-      const token = jwt.sign(
-        {
-          id: customer.id,
-          role: customer.role,
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: "7d" }
-      );
-
-      return reply.send({
-        message: "Login successful",
-        user: {
-          id: customer.id,
-          firstName: customer.firstName,
-          lastName: customer.lastName,
-          phone: customer.phone,
-          role: customer.role,
-        },
-        token,
-      });
-
-    } catch (err) {
-      console.error("Error in combined login:", err);
-      reply
-        .status(500)
-        .send({ error: "Failed to login", details: err.message });
+    if (!username || !password) {
+      return reply.status(400).send({ error: "Missing fields" });
     }
-  },
+
+    const customer = await userModel.customerLogin(username, password);
+
+    if (!customer) {
+      return reply.status(401).send({ error: "User Not Found" });
+    }
+
+    const token = jwt.sign(
+      { 
+        id: customer.id, 
+        role: customer.role,
+
+        businessId: customer.businessId 
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" } 
+    );
+
+    console.log("LOGIN DEBUG - Generated token with 24h expiry");
+    console.log("LOGIN DEBUG - Customer ID:", customer.id);
+
+
+    return reply.send({
+      message: "Login successful",
+      customer: { 
+        id: customer.id,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        phone: customer.phone,
+        role: customer.role,
+  
+      },
+      token,
+      memberships: [] 
+    });
+  } catch (err) {
+    console.error("Error in customer login:", err);
+    reply
+      .status(500)
+      .send({ error: "Failed to login", details: err.message });
+  }
+},
 
   async merchantLogin(request, reply) {
     try {
@@ -271,10 +277,9 @@ const userController = {
         return reply.status(401).send({ error: "User not found" });
       }
 
-      // 🪪 Generate token - CHANGED: Use 'id' instead of 'userId' to match middleware
       const token = jwt.sign(
         {
-          id: user.id, // CHANGED: from 'userId' to 'id'
+          id: user.id,
           role: user.role,
           businessId: user.businessId,
         },
@@ -316,7 +321,6 @@ const userController = {
         return reply.status(409).send({ error: "User already exists" });
       }
 
-      // Insert new merchant
       const newMerchant = await userModel.merchantRegister(
         firstName,
         lastName,
@@ -378,98 +382,166 @@ const userController = {
     }
   },
 
-async customerRegister(request, reply) {
-  try {
-    const {
-      firstName,
-      lastName,
-      email,
-      phone,
-      password,
-      region,
-      province,
-      city,
-      barangay,
-      postalCode,
-      addressDetails,
-    } = request.body;
+  async customerRegister(request, reply) {
+    try {
+      const input = Object.fromEntries(
+        Object.entries(request.body).map(([key, value]) => [
+          key,
+          typeof value === "string" ? value.trim() : value,
+        ])
+      );
 
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !phone ||
-      !password ||
-      !region ||
-      !province ||
-      !city ||
-      !barangay ||
-      !postalCode ||
-      !addressDetails
-    ) {
-      return reply
-        .status(400)
-        .send({ success: false, error: "Please fill up all required fields" });
+      const {
+        profile,
+        firstName,
+        lastName,
+        email,
+        phone,
+        birthday,
+        password,
+        region,
+        province,
+        city,
+        barangay,
+        postalCode,
+        addressDetails,
+      } = input;
+
+      const requiredFields = [
+        "profile",
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "birthday",
+        "password",
+        "region",
+        "province",
+        "city",
+        "barangay",
+        "postalCode",
+        "addressDetails",
+      ];
+
+      for (const field of requiredFields) {
+        if (
+          !input[field] ||
+          (typeof input[field] === "string" && input[field].trim() === "")
+        ) {
+          return reply.status(400).send({
+            success: false,
+            error: `Field '${field}' is required and cannot be empty`,
+          });
+        }
+      }
+
+      // Phone validation
+      const normalizedPhone = phone.replace(/\D/g, "");
+      if (normalizedPhone.length !== 11) {
+        return reply.status(400).send({
+          success: false,
+          error: "Phone number must be exactly 11 digits",
+        });
+      }
+
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return reply.status(400).send({
+          success: false,
+          error: "Invalid email format",
+        });
+      }
+
+      // Postal code validation
+      if (!/^\d{4,6}$/.test(postalCode)) {
+        return reply.status(400).send({
+          success: false,
+          error: "Postal code must be 4-6 digits",
+        });
+      }
+
+      // Password strength validation (optional but recommended)
+      if (password.length < 8) {
+        return reply.status(400).send({
+          success: false,
+          error: "Password must be at least 8 characters long",
+        });
+      }
+
+      // Check for existing email
+      const existingEmail = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.email, email.toLowerCase()));
+
+      if (existingEmail.length > 0) {
+        return reply.status(400).send({
+          success: false,
+          error: "Email already registered",
+        });
+      }
+
+      // Check for existing phone number
+      const existingPhone = await db
+        .select()
+        .from(customers)
+        .where(eq(customers.phone, normalizedPhone));
+
+      if (existingPhone.length > 0) {
+        return reply.status(400).send({
+          success: false,
+          error: "Phone number already registered",
+        });
+      }
+
+      // Create customer
+      const customer = await userModel.customerRegister({
+        profile,
+        firstName,
+        lastName,
+        email: email.toLowerCase(), // Store email in lowercase
+        phone: normalizedPhone,
+        birthday,
+        password,
+        region,
+        province,
+        city,
+        barangay,
+        postalCode,
+        addressDetails,
+      });
+
+      // Remove sensitive data from response
+      const { password: _, ...customerResponse } = customer;
+
+      return reply.status(201).send({
+        success: true,
+        message: "Customer registered successfully!",
+        customer: customerResponse,
+      });
+    } catch (err) {
+      console.error("Error in customer register:", err);
+
+      // Handle specific database errors
+      if (err.code === "23505") {
+        // PostgreSQL unique violation
+        return reply.status(400).send({
+          success: false,
+          error: "Email or phone number already exists",
+        });
+      }
+
+      return reply.status(500).send({
+        success: false,
+        error: "Failed to register customer",
+        details:
+          process.env.NODE_ENV === "development"
+            ? err.message
+            : "Internal server error",
+      });
     }
-
-    if (phone.length !== 11 || !/^\d+$/.test(phone)) {
-      return reply
-        .status(400)
-        .send({ success: false, error: "Phone number must be 11 digits" });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return reply
-        .status(400)
-        .send({ success: false, error: "Invalid email format" });
-    }
-
-    if (!/^\d{4,6}$/.test(postalCode)) {
-      return reply
-        .status(400)
-        .send({ success: false, error: "Invalid postal code format" });
-    }
-
-    const existing = await db
-      .select()
-      .from(customers)
-      .where(eq(customers.email, email));
-
-    if (existing.length > 0) {
-      return reply
-        .status(400)
-        .send({ success: false, error: "Email already registered" });
-    }
-
-    const customer = await userModel.customerRegister({
-      firstName,
-      lastName,
-      email,
-      phone,
-      password,
-      region,
-      province,
-      city,
-      barangay,
-      postalCode,
-      addressDetails,
-    });
-
-    return reply.status(201).send({
-      success: true,
-      message: "Customer registered successfully!",
-      customer,
-    });
-  } catch (err) {
-    console.error("Error in customer register:", err);
-    return reply.status(500).send({
-      success: false,
-      error: "Failed to register customer",
-      details: err.message,
-    });
-  }
-},
+  },
 
   async createUser(req, reply) {
     try {
@@ -523,7 +595,6 @@ async customerRegister(request, reply) {
         return reply.code(404).send({ error: "User not found" });
       }
 
-      // Don't send password back to client
       const { password, ...userWithoutPassword } = user;
       reply.send(userWithoutPassword);
     } catch (err) {
@@ -544,7 +615,6 @@ async customerRegister(request, reply) {
           .send({ error: "Username parameter is required" });
       }
 
-      // Check if user exists first
       const existingUser = await userModel.getUserByUsername(username);
       if (!existingUser) {
         return reply.code(404).send({ error: "User not found" });

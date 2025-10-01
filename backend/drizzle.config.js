@@ -9,6 +9,6 @@ export default {
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: connectionString, //use url instead of connectionString
+    url: connectionString,
   },
 };
