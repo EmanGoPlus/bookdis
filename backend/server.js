@@ -59,6 +59,12 @@ const start = async () => {
     io.on("connection", (socket) => {
       console.log("New client connected:", socket.id);
 
+      // Handle room joining for targeted events
+      socket.on("join-room", (room) => {
+        socket.join(room);
+        console.log(`Socket ${socket.id} joined room: ${room}`);
+      });
+
       socket.on("disconnect", () => {
         console.log("Client disconnected:", socket.id);
       });

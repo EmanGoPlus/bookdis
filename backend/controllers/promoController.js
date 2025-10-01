@@ -76,6 +76,10 @@ const promoController = {
 
       const newPromo = await promoModel.createPromo(promoData);
 
+      // in createPromo
+request.server.io.emit("promoUpdate", { promoId: newPromo.id, promo: newPromo });
+
+
       request.server.io.emit("promo-created", newPromo);
 
       return reply.status(201).send({
@@ -150,7 +154,7 @@ const promoController = {
   async claimPromo(request, reply) {
     try {
       const promoId = parseInt(request.params.id, 10);
-      const customerId = request.user.id; // Use the actual logged-in customer ID from JWT
+      const customerId = request.user.id;
       const now = new Date();
 
       if (!promoId) {
@@ -217,6 +221,13 @@ const promoController = {
         customerId,
         qrCode,
         qrExpiresAt,
+      });
+
+      request.server.io.emit("promoUpdate", { promoId });
+
+      request.server.io.to(`customer-${customerId}`).emit("promoClaimed", {
+        claim,
+        promoId,
       });
 
       request.server.io.emit("promo-claimed", {
@@ -321,11 +332,10 @@ const promoController = {
     }
   },
 
-  // POST /api/user/employee/redeem-promo or /api/user/merchant/redeem-promo
 async redeemPromo(request, reply) {
   try {
     const { qrCode } = request.body;
-    const employeeOrMerchant = request.user; // from JWT
+    const employeeOrMerchant = request.user;
     const now = new Date();
 
     if (!qrCode) {
@@ -337,6 +347,7 @@ async redeemPromo(request, reply) {
 
     // 1. Find the claim by QR code
     const claim = await promoModel.getClaimByQrCode(qrCode);
+    console.log("=== CLAIM FOUND ===", claim);
 
     if (!claim) {
       return reply.status(404).send({
@@ -365,7 +376,7 @@ async redeemPromo(request, reply) {
 
     // 4. Verify the employee/merchant belongs to the same business as the promo
     const business = await promoModel.getBusinessByPromo(claim.promoId);
-    
+
     if (!business) {
       return reply.status(404).send({
         success: false,
@@ -378,35 +389,48 @@ async redeemPromo(request, reply) {
       if (employeeOrMerchant.businessId !== business.businessId) {
         return reply.status(403).send({
           success: false,
-          message: "You are not authorized to redeem promos for this business",
+          message:
+            "You are not authorized to redeem promos for this business",
         });
       }
     }
-    
+
     // For merchants: check if they own the business
     if (employeeOrMerchant.role === "merchant") {
-      // You'll need to add a check here to verify the merchant owns the business
-      // For now, assuming you have this in your business model
-      const merchantBusiness = await promoModel.getBusinessByMerchant(employeeOrMerchant.id);
-      
-      if (!merchantBusiness || merchantBusiness.businessId !== business.businessId) {
+      const merchantBusiness = await promoModel.getBusinessByMerchant(
+        employeeOrMerchant.id
+      );
+
+      if (
+        !merchantBusiness ||
+        merchantBusiness.businessId !== business.businessId
+      ) {
         return reply.status(403).send({
           success: false,
-          message: "You are not authorized to redeem promos for this business",
+          message:
+            "You are not authorized to redeem promos for this business",
         });
       }
     }
 
     // 5. Mark as redeemed
     const redeemedClaim = await promoModel.redeemClaim(claim.claimId);
+    console.log("=== REDEEMED CLAIM ===", redeemedClaim);
 
-    // 6. Emit socket event for real-time update
-    request.server.io.emit("promo-redeemed", {
+    // 6. Emit socket event to the specific customer
+    const socketData = {
       claimId: claim.claimId,
       promoId: claim.promoId,
-      customerId: claim.customerId,
-      redeemedAt: now,
-    });
+      redeemedAt: redeemedClaim.redeemedAt || now,
+    };
+    
+    console.log("=== EMITTING TO ROOM ===", `customer-${claim.customerId}`);
+    console.log("=== SOCKET DATA ===", socketData);
+    
+    request.server.io.to(`customer-${claim.customerId}`).emit("promoRedeemed", socketData);
+
+    // 7. Emit general update for promo list refresh
+    request.server.io.emit("promoUpdate", { promoId: claim.promoId });
 
     return reply.status(200).send({
       success: true,
@@ -426,7 +450,7 @@ async redeemPromo(request, reply) {
       error: error.message,
     });
   }
-},
+}
 };
 
 export default promoController;

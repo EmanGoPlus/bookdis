@@ -13,6 +13,8 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../apiConfig";
 import { UserContext } from "../context/AuthContext";
+import io from "socket.io-client";
+
 
 export default function QrScannerScreen({ navigation }) {
   const [hasPermission, setHasPermission] = useState(null);
@@ -20,8 +22,40 @@ export default function QrScannerScreen({ navigation }) {
   const [promoData, setPromoData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [userToken, setUserToken] = useState(null);
+    const [socket, setSocket] = useState(null);
   
   const { user, userRole, isMerchant, isEmployee } = useContext(UserContext);
+
+  // Setup Socket.io connection
+  useEffect(() => {
+    if (!userToken) return;
+
+    const newSocket = io(API_BASE_URL, {
+      transports: ["websocket"],
+      auth: { token: userToken },
+    });
+
+    newSocket.on("connect", () => {
+      console.log("Scanner socket connected:", newSocket.id);
+    });
+
+    newSocket.on("promoUpdate", (data) => {
+      console.log("Promo updated after redemption:", data);
+      // Optionally show a toast or update UI
+    });
+
+    newSocket.on("disconnect", () => {
+      console.log("Scanner socket disconnected");
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, [userToken]);
 
   useEffect(() => {
     const getToken = async () => {
@@ -38,12 +72,11 @@ export default function QrScannerScreen({ navigation }) {
     })();
   }, []);
 
-  const handleBarCodeScanned = async ({ type, data }) => {
+ const handleBarCodeScanned = async ({ type, data }) => {
     setScanned(true);
     setLoading(true);
     
     try {
-      // Determine endpoint based on user role
       const endpoint = isMerchant() 
         ? '/api/user/merchant/redeem-promo'
         : '/api/user/employee/redeem-promo';
@@ -63,6 +96,7 @@ export default function QrScannerScreen({ navigation }) {
           redeemedAt: response.data.data.redeemedAt,
           claimId: response.data.data.claimId,
         });
+        
       }
     } catch (error) {
       setPromoData({
@@ -152,7 +186,7 @@ export default function QrScannerScreen({ navigation }) {
                 <>
                   <View style={styles.successHeader}>
                     <Text style={styles.successIcon}>✓</Text>
-                    <Text style={styles.successTitle}>Promo Redeemed!</Text>
+                    <Text style={styles.successTitle}>Promo Claimed!</Text>
                   </View>
 
                   <View style={styles.detailsCard}>

@@ -49,54 +49,95 @@ export default function Home({ navigation }) {
     };
   }, [customer]);
 
-  const setupSocket = () => {
-    if (!customer?.token) return;
+// Add this after your other useEffects in Home.js
 
-    const newSocket = io(API_BASE_URL, {
-      transports: ["websocket"],
-      auth: { token: customer.token },
+// Debug logger for state changes
+useEffect(() => {
+  console.log("📊 claimedPromos updated:", Object.keys(claimedPromos).length, "claims");
+  Object.entries(claimedPromos).forEach(([promoId, claim]) => {
+    console.log(`  Promo ${promoId}:`, {
+      isRedeemed: claim.isRedeemed,
+      claimId: claim.claimId
     });
+  });
+}, [claimedPromos]);
 
-    newSocket.on("connect", () => {
-      console.log("Socket connected:", newSocket.id);
-    });
+// Updated setupSocket with fixed event handling
+const setupSocket = () => {
+  if (!customer?.token || !customer?.id) {
+    console.warn("Cannot setup socket: missing customer token or id");
+    return;
+  }
 
-    newSocket.on("disconnect", () => {
-      console.log("Socket disconnected");
-    });
+  const newSocket = io(API_BASE_URL, {
+    transports: ["websocket"],
+    auth: { token: customer.token },
+  });
 
-    newSocket.on("promoUpdate", (data) => {
-      console.log("Received promo update:", data);
-      fetchPromos();
-    });
+  newSocket.on("connect", () => {
+    const roomName = `customer-${customer.id}`;
+    console.log("✅ Socket connected:", newSocket.id);
+    console.log("👤 Customer ID:", customer.id);
+    console.log("🚪 Joining room:", roomName);
+    
+newSocket.emit("join-room", roomName);
 
-    // Listen for promo redemption events
-    newSocket.on("promoRedeemed", (data) => {
-      console.log("Promo redeemed:", data);
-      // Refresh claimed promos to update status
-      fetchClaimedPromos();
-      
-      // Close modal if it's open and showing the redeemed promo
-      if (qrModalVisible && claimedPromoData?.claimId === data.claimId) {
-        setQrModalVisible(false);
-        Alert.alert("Success", "Your promo has been redeemed!");
+  });
+
+  newSocket.on("disconnect", () => {
+    console.log("❌ Socket disconnected");
+  });
+
+  // General promo updates
+  newSocket.on("promoUpdate", (data) => {
+    console.log("🔄 Promo update received:", data);
+    fetchPromos();
+  });
+
+  // When YOU claim a promo
+  newSocket.on("promoClaimed", (data) => {
+    console.log("✨ You claimed promo:", data);
+    
+    setClaimedPromos(prev => ({
+      ...prev,
+      [data.promoId]: data.claim
+    }));
+    
+    fetchPromos();
+  });
+
+newSocket.on("promoRedeemed", (data) => {
+  console.log("🎉 === PROMO REDEEMED EVENT RECEIVED ===");
+  console.log("Event data:", JSON.stringify(data, null, 2));
+  console.log("Current claimedPromos state:", claimedPromos);
+
+  // Update the claimed promos state immediately
+  setClaimedPromos(prev => {
+    console.log("Before update - prev[" + data.promoId + "]:", prev[data.promoId]);
+
+    const updated = {
+      ...prev,
+      [data.promoId]: {
+        ...prev[data.promoId],
+        isRedeemed: true,
+        redeemedAt: data.redeemedAt,
       }
-    });
+    };
 
-    newSocket.on("connect_error", (error) => {
-      console.log("Socket connection error:", error.message);
-      if (
-        error.message.includes("Authentication") ||
-        error.message.includes("token")
-      ) {
-        console.log(
-          "Socket auth failed - user will be auto-logged out by axios interceptor"
-        );
-      }
-    });
+    console.log("After update - updated[" + data.promoId + "]:", updated[data.promoId]);
+    return updated;
+  });
 
-    setSocket(newSocket);
-  };
+  fetchPromos();
+});
+
+
+  newSocket.on("connect_error", (error) => {
+    console.error("❌ Socket connection error:", error.message);
+  });
+
+  setSocket(newSocket);
+};
 
   const fetchPromos = async () => {
     if (!customer?.token) return;
@@ -112,7 +153,9 @@ export default function Home({ navigation }) {
       );
 
       if (response.data && Array.isArray(response.data.data)) {
+        
         setPromos(response.data.data);
+
       } else {
         setPromos([]);
         Alert.alert("Info", "No promos available at this time");
@@ -149,6 +192,7 @@ export default function Home({ navigation }) {
           claimedMap[claim.promoId] = claim;
         });
         setClaimedPromos(claimedMap);
+
       }
     } catch (error) {
       console.error("Error fetching claimed promos:", error);
@@ -419,6 +463,7 @@ export default function Home({ navigation }) {
                   item.promoId?.toString() || index.toString()
                 }
                 renderItem={renderPromo}
+                 extraData={claimedPromos} 
                 contentContainerStyle={styles.promosList}
                 refreshControl={
                   <RefreshControl
