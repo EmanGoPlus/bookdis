@@ -3,11 +3,9 @@ import {
   claimedPromos,
   promos,
   customerMemberships,
-   customers,
+  customers,
   businesses,
 } from "../db/schema.js";
-import { nanoid } from "nanoid";
-import crypto from "crypto";
 import { eq, and, lte, gte, count } from "drizzle-orm";
 
 const promoModel = {
@@ -158,8 +156,6 @@ const promoModel = {
   },
 
   async redeemPromo(promoId, customerId) {},
-
-  // Add these to your existing promoModel
 
   async getClaimByQrCode(qrCode) {
     const result = await db

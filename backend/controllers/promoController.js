@@ -77,8 +77,10 @@ const promoController = {
       const newPromo = await promoModel.createPromo(promoData);
 
       // in createPromo
-request.server.io.emit("promoUpdate", { promoId: newPromo.id, promo: newPromo });
-
+      request.server.io.emit("promoUpdate", {
+        promoId: newPromo.id,
+        promo: newPromo,
+      });
 
       request.server.io.emit("promo-created", newPromo);
 
@@ -332,125 +334,137 @@ request.server.io.emit("promoUpdate", { promoId: newPromo.id, promo: newPromo })
     }
   },
 
-async redeemPromo(request, reply) {
-  try {
-    const { qrCode } = request.body;
-    const employeeOrMerchant = request.user;
-    const now = new Date();
+  async redeemPromo(request, reply) {
+    try {
+      const { qrCode } = request.body;
+      const employeeOrMerchant = request.user;
+      const now = new Date();
 
-    if (!qrCode) {
-      return reply.status(400).send({
-        success: false,
-        message: "QR code is required",
-      });
-    }
-
-    // 1. Find the claim by QR code
-    const claim = await promoModel.getClaimByQrCode(qrCode);
-    console.log("=== CLAIM FOUND ===", claim);
-
-    if (!claim) {
-      return reply.status(404).send({
-        success: false,
-        message: "Invalid QR code - claim not found",
-      });
-    }
-
-    // 2. Check if already redeemed
-    if (claim.isRedeemed) {
-      return reply.status(400).send({
-        success: false,
-        message: "This promo has already been redeemed",
-        redeemedAt: claim.redeemedAt,
-      });
-    }
-
-    // 3. Check if QR code has expired
-    if (claim.qrExpiresAt < now) {
-      return reply.status(400).send({
-        success: false,
-        message: "QR code has expired",
-        expiredAt: claim.qrExpiresAt,
-      });
-    }
-
-    // 4. Verify the employee/merchant belongs to the same business as the promo
-    const business = await promoModel.getBusinessByPromo(claim.promoId);
-
-    if (!business) {
-      return reply.status(404).send({
-        success: false,
-        message: "Business not found for this promo",
-      });
-    }
-
-    // For employees: check if they belong to the business
-    if (employeeOrMerchant.role === "employee") {
-      if (employeeOrMerchant.businessId !== business.businessId) {
-        return reply.status(403).send({
+      if (!qrCode) {
+        return reply.status(400).send({
           success: false,
-          message:
-            "You are not authorized to redeem promos for this business",
+          message: "QR code is required",
         });
       }
-    }
 
-    // For merchants: check if they own the business
-    if (employeeOrMerchant.role === "merchant") {
-      const merchantBusiness = await promoModel.getBusinessByMerchant(
-        employeeOrMerchant.id
+      // 1. Find the claim by QR code
+      const claim = await promoModel.getClaimByQrCode(qrCode);
+      console.log("=== CLAIM FOUND ===", claim);
+
+      if (!claim) {
+        return reply.status(404).send({
+          success: false,
+          message: "Invalid QR code - claim not found",
+        });
+      }
+
+      // 2. Check if already redeemed
+      if (claim.isRedeemed) {
+        return reply.status(400).send({
+          success: false,
+          message: "This promo has already been redeemed",
+          redeemedAt: claim.redeemedAt,
+        });
+      }
+
+      // 3. Check if QR code has expired
+      if (claim.qrExpiresAt < now) {
+        return reply.status(400).send({
+          success: false,
+          message: "QR code has expired",
+          expiredAt: claim.qrExpiresAt,
+        });
+      }
+
+      // 4. Verify the employee/merchant belongs to the same business as the promo
+      const business = await promoModel.getBusinessByPromo(claim.promoId);
+
+      if (!business) {
+        return reply.status(404).send({
+          success: false,
+          message: "Business not found for this promo",
+        });
+      }
+
+      if (employeeOrMerchant.role === "employee") {
+        if (employeeOrMerchant.businessId !== business.businessId) {
+          return reply.status(403).send({
+            success: false,
+            message:
+              "You are not authorized to redeem promos for this business",
+          });
+        }
+      }
+
+      if (employeeOrMerchant.role === "merchant") {
+        const merchantBusiness = await promoModel.getBusinessByMerchant(
+          employeeOrMerchant.id
+        );
+
+        if (
+          !merchantBusiness ||
+          merchantBusiness.businessId !== business.businessId
+        ) {
+          return reply.status(403).send({
+            success: false,
+            message:
+              "You are not authorized to redeem promos for this business",
+          });
+        }
+      }
+
+      // 5. Mark as redeemed
+      const redeemedClaim = await promoModel.redeemClaim(claim.claimId);
+      console.log("=== REDEEMED CLAIM ===", redeemedClaim);
+
+      // 6. IMPORTANT: Emit socket event to the specific customer with ALL necessary data
+      const socketData = {
+        claimId: claim.claimId,
+        promoId: claim.promoId,
+        customerId: claim.customerId,
+        redeemedAt: redeemedClaim.redeemedAt || now,
+        promoTitle: claim.promoTitle,
+      };
+
+      const customerRoom = `customer-${claim.customerId}`;
+
+      console.log("=== EMITTING TO ROOM ===", customerRoom);
+      console.log("=== SOCKET DATA ===", JSON.stringify(socketData, null, 2));
+
+      // Emit to the specific customer's room
+      request.server.io.to(customerRoom).emit("promoRedeemed", socketData);
+
+      // Also emit to check connected sockets in the room (for debugging)
+      const socketsInRoom = await request.server.io
+        .in(customerRoom)
+        .fetchSockets();
+      console.log(
+        `=== SOCKETS IN ROOM ${customerRoom} ===`,
+        socketsInRoom.length
       );
 
-      if (
-        !merchantBusiness ||
-        merchantBusiness.businessId !== business.businessId
-      ) {
-        return reply.status(403).send({
-          success: false,
-          message:
-            "You are not authorized to redeem promos for this business",
-        });
-      }
+      // 7. Emit general update for promo list refresh (to all users)
+      request.server.io.emit("promoUpdate", { promoId: claim.promoId });
+
+      return reply.status(200).send({
+        success: true,
+        message: "Promo redeemed successfully",
+        data: {
+          claimId: redeemedClaim.id,
+          promoTitle: claim.promoTitle,
+          customerName: `${claim.customerFirstName} ${claim.customerLastName}`,
+          redeemedAt: redeemedClaim.redeemedAt,
+        },
+      });
+    } catch (error) {
+      console.error("Redeem promo error:", error);
+      return reply.status(500).send({
+        success: false,
+        message: "Failed to redeem promo",
+        error: error.message,
+      });
     }
-
-    // 5. Mark as redeemed
-    const redeemedClaim = await promoModel.redeemClaim(claim.claimId);
-    console.log("=== REDEEMED CLAIM ===", redeemedClaim);
-
-    // 6. Emit socket event to the specific customer
-    const socketData = {
-      claimId: claim.claimId,
-      promoId: claim.promoId,
-      redeemedAt: redeemedClaim.redeemedAt || now,
-    };
-    
-    console.log("=== EMITTING TO ROOM ===", `customer-${claim.customerId}`);
-    console.log("=== SOCKET DATA ===", socketData);
-    
-    request.server.io.to(`customer-${claim.customerId}`).emit("promoRedeemed", socketData);
-
-    // 7. Emit general update for promo list refresh
-    request.server.io.emit("promoUpdate", { promoId: claim.promoId });
-
-    return reply.status(200).send({
-      success: true,
-      message: "Promo redeemed successfully",
-      data: {
-        claimId: redeemedClaim.id,
-        promoTitle: claim.promoTitle,
-        customerName: `${claim.customerFirstName} ${claim.customerLastName}`,
-        redeemedAt: redeemedClaim.redeemedAt,
-      },
-    });
-  } catch (error) {
-    console.error("Redeem promo error:", error);
-    return reply.status(500).send({
-      success: false,
-      message: "Failed to redeem promo",
-      error: error.message,
-    });
-  }
-}
+  },
 };
 
 export default promoController;

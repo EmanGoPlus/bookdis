@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useRef } from "react";
 import { CustomerContext } from "../../context/AuthContext";
 import {
   View,
@@ -12,12 +12,12 @@ import {
   Image,
   Modal,
   Dimensions,
+  Animated,
 } from "react-native";
 import axios from "axios";
 import io from "socket.io-client";
 import { API_BASE_URL } from "../../apiConfig";
 import QRCode from 'react-native-qrcode-svg';
-
 
 const { width } = Dimensions.get('window');
 
@@ -27,7 +27,17 @@ export default function Home({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [claimedPromoData, setClaimedPromoData] = useState(null);
-  const [claimedPromos, setClaimedPromos] = useState({}); // Track claimed promos
+  const [claimedPromos, setClaimedPromos] = useState({});
+  
+  // New state for success modal
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [redeemedPromoTitle, setRedeemedPromoTitle] = useState("");
+  const [checkmarkScale] = useState(new Animated.Value(0));
+  
+  // ✅ Add refs to track current state for socket handlers
+  const qrModalVisibleRef = useRef(false);
+  const claimedPromoDataRef = useRef(null);
+  
   const {
     customer,
     logout,
@@ -35,10 +45,19 @@ export default function Home({ navigation }) {
   } = useContext(CustomerContext);
   const [socket, setSocket] = useState(null);
 
+  // ✅ Update refs whenever state changes
+  useEffect(() => {
+    qrModalVisibleRef.current = qrModalVisible;
+  }, [qrModalVisible]);
+
+  useEffect(() => {
+    claimedPromoDataRef.current = claimedPromoData;
+  }, [claimedPromoData]);
+
   useEffect(() => {
     if (customer?.token) {
       fetchPromos();
-      fetchClaimedPromos(); // Fetch claimed promos on mount
+      fetchClaimedPromos();
       setupSocket();
     }
 
@@ -49,95 +68,142 @@ export default function Home({ navigation }) {
     };
   }, [customer]);
 
-// Add this after your other useEffects in Home.js
-
-// Debug logger for state changes
-useEffect(() => {
-  console.log("📊 claimedPromos updated:", Object.keys(claimedPromos).length, "claims");
-  Object.entries(claimedPromos).forEach(([promoId, claim]) => {
-    console.log(`  Promo ${promoId}:`, {
-      isRedeemed: claim.isRedeemed,
-      claimId: claim.claimId
+  useEffect(() => {
+    console.log("📊 claimedPromos updated:", Object.keys(claimedPromos).length, "claims");
+    Object.entries(claimedPromos).forEach(([promoId, claim]) => {
+      console.log(`  Promo ${promoId}:`, {
+        isRedeemed: claim.isRedeemed,
+        claimId: claim.claimId
+      });
     });
-  });
-}, [claimedPromos]);
+  }, [claimedPromos]);
 
-// Updated setupSocket with fixed event handling
-const setupSocket = () => {
-  if (!customer?.token || !customer?.id) {
-    console.warn("Cannot setup socket: missing customer token or id");
-    return;
-  }
+  const setupSocket = () => {
+    if (!customer?.token || !customer?.id) {
+      console.warn("Cannot setup socket: missing customer token or id");
+      return;
+    }
 
-  const newSocket = io(API_BASE_URL, {
-    transports: ["websocket"],
-    auth: { token: customer.token },
-  });
+    const newSocket = io(API_BASE_URL, {
+      transports: ["websocket"],
+      auth: { token: customer.token },
+    });
 
-  newSocket.on("connect", () => {
-    const roomName = `customer-${customer.id}`;
-    console.log("✅ Socket connected:", newSocket.id);
-    console.log("👤 Customer ID:", customer.id);
-    console.log("🚪 Joining room:", roomName);
-    
-newSocket.emit("join-room", roomName);
+    newSocket.on("connect", () => {
+      const roomName = `customer-${customer.id}`;
+      console.log("✅ Socket connected:", newSocket.id);
+      console.log("👤 Customer ID:", customer.id);
+      console.log("🚪 Joining room:", roomName);
+      
+      // Join the customer-specific room
+      newSocket.emit("join-room", roomName);
+      
+      // Confirm room join (if your backend sends confirmation)
+      newSocket.on("room-joined", (data) => {
+        console.log("✅ Successfully joined room:", data);
+      });
+    });
 
-  });
+    newSocket.on("disconnect", () => {
+      console.log("❌ Socket disconnected");
+    });
 
-  newSocket.on("disconnect", () => {
-    console.log("❌ Socket disconnected");
-  });
+    newSocket.on("promoUpdate", (data) => {
+      console.log("🔄 Promo update received:", data);
+      fetchPromos();
+    });
 
-  // General promo updates
-  newSocket.on("promoUpdate", (data) => {
-    console.log("🔄 Promo update received:", data);
-    fetchPromos();
-  });
+    newSocket.on("promoClaimed", (data) => {
+      console.log("✨ You claimed promo:", data);
+      
+      setClaimedPromos(prev => ({
+        ...prev,
+        [data.promoId]: data.claim
+      }));
+      
+      fetchPromos();
+    });
 
-  // When YOU claim a promo
-  newSocket.on("promoClaimed", (data) => {
-    console.log("✨ You claimed promo:", data);
-    
-    setClaimedPromos(prev => ({
-      ...prev,
-      [data.promoId]: data.claim
-    }));
-    
-    fetchPromos();
-  });
+    // Enhanced promoRedeemed handler with auto-close QR and success modal
+    newSocket.on("promoRedeemed", (data) => {
+      console.log("🎉 === PROMO REDEEMED EVENT RECEIVED ===");
+      console.log("Event data:", JSON.stringify(data, null, 2));
+      
+      // ✅ Use refs to get current state values
+      const isModalOpen = qrModalVisibleRef.current;
+      const currentClaimData = claimedPromoDataRef.current;
+      
+      console.log("📍 Ref values at event time:");
+      console.log("  - qrModalVisibleRef.current:", isModalOpen);
+      console.log("  - claimedPromoDataRef.current:", currentClaimData);
+      console.log("  - Has claim data:", !!currentClaimData);
+      console.log("  - Event promoId:", data.promoId);
+      console.log("  - Event claimId:", data.claimId);
 
-newSocket.on("promoRedeemed", (data) => {
-  console.log("🎉 === PROMO REDEEMED EVENT RECEIVED ===");
-  console.log("Event data:", JSON.stringify(data, null, 2));
-  console.log("Current claimedPromos state:", claimedPromos);
+      // Get promo title
+      const promoTitle = currentClaimData?.promoTitle || 'Promo';
 
-  // Update the claimed promos state immediately
-  setClaimedPromos(prev => {
-    console.log("Before update - prev[" + data.promoId + "]:", prev[data.promoId]);
+      // Update the claimed promos state
+      setClaimedPromos(prev => {
+        const updated = {
+          ...prev,
+          [data.promoId]: {
+            ...prev[data.promoId],
+            isRedeemed: true,
+            redeemedAt: data.redeemedAt,
+          }
+        };
+        return updated;
+      });
 
-    const updated = {
-      ...prev,
-      [data.promoId]: {
-        ...prev[data.promoId],
-        isRedeemed: true,
-        redeemedAt: data.redeemedAt,
+      // IMMEDIATELY check and close if modal is open
+      console.log("🔒 Checking if we should close modal...");
+      console.log("   isModalOpen:", isModalOpen);
+      console.log("   currentClaimData exists:", !!currentClaimData);
+      
+      // Simplified check - if ANY modal is open, close it
+      if (isModalOpen) {
+        console.log("✅ CLOSING QR MODAL NOW!");
+        
+        // Close QR modal immediately
+        setQrModalVisible(false);
+        setClaimedPromoData(null);
+        
+        // Set the redeemed promo title for success modal
+        setRedeemedPromoTitle(promoTitle);
+        
+        // Show success modal after a brief delay
+        setTimeout(() => {
+          console.log("✅ SHOWING SUCCESS MODAL");
+          setSuccessModalVisible(true);
+          animateCheckmark();
+        }, 400);
+      } else {
+        console.log("❌ QR modal NOT open - isModalOpen is false");
+        console.log("   This means the ref wasn't updated or modal wasn't actually open");
       }
-    };
 
-    console.log("After update - updated[" + data.promoId + "]:", updated[data.promoId]);
-    return updated;
-  });
+      // Always refresh the promo list
+      fetchPromos();
+    });
 
-  fetchPromos();
-});
+    newSocket.on("connect_error", (error) => {
+      console.error("❌ Socket connection error:", error.message);
+    });
 
+    setSocket(newSocket);
+  };
 
-  newSocket.on("connect_error", (error) => {
-    console.error("❌ Socket connection error:", error.message);
-  });
-
-  setSocket(newSocket);
-};
+  // Animate checkmark
+  const animateCheckmark = () => {
+    checkmarkScale.setValue(0);
+    Animated.spring(checkmarkScale, {
+      toValue: 1,
+      friction: 5,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const fetchPromos = async () => {
     if (!customer?.token) return;
@@ -153,9 +219,7 @@ newSocket.on("promoRedeemed", (data) => {
       );
 
       if (response.data && Array.isArray(response.data.data)) {
-        
         setPromos(response.data.data);
-
       } else {
         setPromos([]);
         Alert.alert("Info", "No promos available at this time");
@@ -192,7 +256,6 @@ newSocket.on("promoRedeemed", (data) => {
           claimedMap[claim.promoId] = claim;
         });
         setClaimedPromos(claimedMap);
-
       }
     } catch (error) {
       console.error("Error fetching claimed promos:", error);
@@ -224,15 +287,12 @@ newSocket.on("promoRedeemed", (data) => {
   const handleClaimPromo = async (promoId) => {
     if (!customer?.token) return;
 
-    // Check if already claimed
     const claimData = claimedPromos[promoId];
     if (claimData) {
-      // If already redeemed, show message
       if (claimData.isRedeemed) {
         Alert.alert("Already Claimed", "This promo has already been redeemed!");
         return;
       }
-      // Otherwise show the QR
       handleViewQR(promoId);
       return;
     }
@@ -247,10 +307,10 @@ newSocket.on("promoRedeemed", (data) => {
       if (response.data.success) {
         const claimData = {
           ...response.data.data,
+          promoId: promoId,
           promoTitle: promos.find(p => p.promoId === promoId)?.title || 'Promo'
         };
         
-        // Update claimed promos map
         setClaimedPromos(prev => ({
           ...prev,
           [promoId]: claimData
@@ -258,16 +318,19 @@ newSocket.on("promoRedeemed", (data) => {
         
         setClaimedPromoData(claimData);
         setQrModalVisible(true);
-        fetchPromos(); // refresh list
+        
+        // ✅ Manually update refs immediately
+        qrModalVisibleRef.current = true;
+        claimedPromoDataRef.current = claimData;
+        
+        fetchPromos();
       } else {
         Alert.alert("Failed", response.data.message);
       }
     } catch (error) {
-      // If backend says already claimed, fetch claimed promos and show QR
       if (error.response?.status === 400 && 
           error.response?.data?.message?.includes("claim limit")) {
         await fetchClaimedPromos();
-        // Try to show QR after fetching
         setTimeout(() => {
           if (claimedPromos[promoId]) {
             handleViewQR(promoId);
@@ -286,22 +349,43 @@ newSocket.on("promoRedeemed", (data) => {
 
   const handleViewQR = (promoId) => {
     const claimData = claimedPromos[promoId];
+    console.log("🔍 handleViewQR called for promoId:", promoId);
+    console.log("🔍 claimData:", claimData);
+    
     if (claimData) {
       if (claimData.isRedeemed) {
         Alert.alert("Already Claimed", "This promo has already been redeemed!");
         return;
       }
-      setClaimedPromoData({
+      
+      const dataToSet = {
         ...claimData,
+        promoId: promoId,
         promoTitle: promos.find(p => p.promoId === promoId)?.title || 'Promo'
-      });
+      };
+      
+      console.log("🔍 Setting claimedPromoData:", dataToSet);
+      setClaimedPromoData(dataToSet);
       setQrModalVisible(true);
+      
+      // ✅ Manually update refs immediately (don't wait for useEffect)
+      qrModalVisibleRef.current = true;
+      claimedPromoDataRef.current = dataToSet;
+      
+      console.log("🔍 QR Modal should now be visible");
+      console.log("🔍 qrModalVisibleRef.current:", qrModalVisibleRef.current);
+      console.log("🔍 claimedPromoDataRef.current:", claimedPromoDataRef.current);
     }
   };
 
   const closeQrModal = () => {
     setQrModalVisible(false);
     setClaimedPromoData(null);
+  };
+
+  const closeSuccessModal = () => {
+    setSuccessModalVisible(false);
+    setRedeemedPromoTitle("");
   };
 
   const formatDate = (dateString) => {
@@ -463,7 +547,7 @@ newSocket.on("promoRedeemed", (data) => {
                   item.promoId?.toString() || index.toString()
                 }
                 renderItem={renderPromo}
-                 extraData={claimedPromos} 
+                extraData={claimedPromos} 
                 contentContainerStyle={styles.promosList}
                 refreshControl={
                   <RefreshControl
@@ -479,6 +563,8 @@ newSocket.on("promoRedeemed", (data) => {
           </>
         )}
       </View>
+
+      {/* QR Code Modal */}
       <Modal
         visible={qrModalVisible}
         transparent={true}
@@ -503,7 +589,6 @@ newSocket.on("promoRedeemed", (data) => {
                   {claimedPromoData.promoTitle}
                 </Text>
 
-                {/* QR Code */}
                 {claimedPromoData.qrCode && !claimedPromoData.isRedeemed && (
                   <View style={styles.qrContainer}>
                     <Text style={styles.qrLabel}>
@@ -555,6 +640,39 @@ newSocket.on("promoRedeemed", (data) => {
                 )}
               </View>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Modal - Shows after QR is scanned */}
+      <Modal
+        visible={successModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeSuccessModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModalContainer}>
+            <Animated.View 
+              style={[
+                styles.checkmarkContainer,
+                { transform: [{ scale: checkmarkScale }] }
+              ]}
+            >
+              <Text style={styles.checkmark}>✓</Text>
+            </Animated.View>
+            
+            <Text style={styles.successTitle}>Promo Claimed!</Text>
+            <Text style={styles.successMessage}>
+              Your promo "{redeemedPromoTitle}" has been successfully redeemed.
+            </Text>
+            
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={closeSuccessModal}
+            >
+              <Text style={styles.successButtonText}>Great!</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -756,7 +874,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 14,
   },
-  // Modal Styles
+  // QR Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -850,5 +968,62 @@ const styles = StyleSheet.create({
     color: "#4F0CBD",
     textAlign: "center",
     fontWeight: "500",
+  },
+  // Success Modal Styles
+  successModalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 30,
+    width: width * 0.85,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+  },
+  checkmarkContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#28a745",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  checkmark: {
+    fontSize: 50,
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  successMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  successButton: {
+    backgroundColor: "#4F0CBD",
+    paddingHorizontal: 40,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 120,
+  },
+  successButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });
