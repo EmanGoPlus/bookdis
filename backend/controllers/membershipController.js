@@ -33,7 +33,6 @@ const membershipController = {
     }
   },
 
-  // Get membership for a customer and business
   async getMembership(request, reply) {
     try {
       const { customerId, businessId } = request.query;
@@ -70,7 +69,6 @@ const membershipController = {
     }
   },
 
-  // Deactivate a membership
   async deactivateMembership(request, reply) {
     try {
       const { customerId, businessId } = request.body;

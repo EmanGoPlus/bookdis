@@ -124,55 +124,53 @@ const userController = {
     }
   },
 
- async customerLogin(request, reply) {
-  try {
-    const { username, password } = request.body;
+  async customerLogin(request, reply) {
+    try {
+      const { username, password } = request.body;
 
-    if (!username || !password) {
-      return reply.status(400).send({ error: "Missing fields" });
+      if (!username || !password) {
+        return reply.status(400).send({ error: "Missing fields" });
+      }
+
+      const customer = await userModel.customerLogin(username, password);
+
+      if (!customer) {
+        return reply.status(401).send({ error: "User Not Found" });
+      }
+
+      const token = jwt.sign(
+        {
+          id: customer.id,
+          role: customer.role,
+
+          businessId: customer.businessId,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "24h" }
+      );
+
+      console.log("LOGIN DEBUG - Generated token with 24h expiry");
+      console.log("LOGIN DEBUG - Customer ID:", customer.id);
+
+      return reply.send({
+        message: "Login successful",
+        customer: {
+          id: customer.id,
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          phone: customer.phone,
+          role: customer.role,
+        },
+        token,
+        memberships: [],
+      });
+    } catch (err) {
+      console.error("Error in customer login:", err);
+      reply
+        .status(500)
+        .send({ error: "Failed to login", details: err.message });
     }
-
-    const customer = await userModel.customerLogin(username, password);
-
-    if (!customer) {
-      return reply.status(401).send({ error: "User Not Found" });
-    }
-
-    const token = jwt.sign(
-      { 
-        id: customer.id, 
-        role: customer.role,
-
-        businessId: customer.businessId 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" } 
-    );
-
-    console.log("LOGIN DEBUG - Generated token with 24h expiry");
-    console.log("LOGIN DEBUG - Customer ID:", customer.id);
-
-
-    return reply.send({
-      message: "Login successful",
-      customer: { 
-        id: customer.id,
-        firstName: customer.firstName,
-        lastName: customer.lastName,
-        phone: customer.phone,
-        role: customer.role,
-  
-      },
-      token,
-      memberships: [] 
-    });
-  } catch (err) {
-    console.error("Error in customer login:", err);
-    reply
-      .status(500)
-      .send({ error: "Failed to login", details: err.message });
-  }
-},
+  },
 
   async merchantLogin(request, reply) {
     try {
@@ -383,16 +381,29 @@ const userController = {
   },
 
   async customerRegister(request, reply) {
+    let profilePath = null;
+
     try {
-      const input = Object.fromEntries(
-        Object.entries(request.body).map(([key, value]) => [
-          key,
-          typeof value === "string" ? value.trim() : value,
-        ])
-      );
+      const parts = request.parts();
+      let customerFields = {};
+
+      for await (const part of parts) {
+        if (part.file) {
+          const uploadDir = path.join(process.cwd(), "uploads", "profile");
+          fs.mkdirSync(uploadDir, { recursive: true });
+
+          const filename = `${Date.now()}_${part.filename}`;
+          const filepath = path.join(uploadDir, filename);
+
+          await pump(part.file, fs.createWriteStream(filepath));
+          profilePath = `uploads/profile/${filename}`;
+        } else {
+          customerFields[part.fieldname] =
+            typeof part.value === "string" ? part.value.trim() : part.value;
+        }
+      }
 
       const {
-        profile,
         firstName,
         lastName,
         email,
@@ -405,102 +416,36 @@ const userController = {
         barangay,
         postalCode,
         addressDetails,
-      } = input;
+      } = customerFields;
 
-      const requiredFields = [
-        "profile",
-        "firstName",
-        "lastName",
-        "email",
-        "phone",
-        "birthday",
-        "password",
-        "region",
-        "province",
-        "city",
-        "barangay",
-        "postalCode",
-        "addressDetails",
-      ];
-
-      for (const field of requiredFields) {
-        if (
-          !input[field] ||
-          (typeof input[field] === "string" && input[field].trim() === "")
-        ) {
-          return reply.status(400).send({
-            success: false,
-            error: `Field '${field}' is required and cannot be empty`,
-          });
-        }
+      if (
+        !firstName ||
+        !lastName ||
+        !email ||
+        !phone ||
+        !birthday ||
+        !password
+      ) {
+        return reply.status(400).send({
+          success: false,
+          error: "Missing required fields",
+        });
       }
 
-      // Phone validation
+      if (!profilePath) {
+        return reply.status(400).send({
+          success: false,
+          error: "Profile picture is required",
+        });
+      }
+
       const normalizedPhone = phone.replace(/\D/g, "");
-      if (normalizedPhone.length !== 11) {
-        return reply.status(400).send({
-          success: false,
-          error: "Phone number must be exactly 11 digits",
-        });
-      }
 
-      // Email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return reply.status(400).send({
-          success: false,
-          error: "Invalid email format",
-        });
-      }
-
-      // Postal code validation
-      if (!/^\d{4,6}$/.test(postalCode)) {
-        return reply.status(400).send({
-          success: false,
-          error: "Postal code must be 4-6 digits",
-        });
-      }
-
-      // Password strength validation (optional but recommended)
-      if (password.length < 8) {
-        return reply.status(400).send({
-          success: false,
-          error: "Password must be at least 8 characters long",
-        });
-      }
-
-      // Check for existing email
-      const existingEmail = await db
-        .select()
-        .from(customers)
-        .where(eq(customers.email, email.toLowerCase()));
-
-      if (existingEmail.length > 0) {
-        return reply.status(400).send({
-          success: false,
-          error: "Email already registered",
-        });
-      }
-
-      // Check for existing phone number
-      const existingPhone = await db
-        .select()
-        .from(customers)
-        .where(eq(customers.phone, normalizedPhone));
-
-      if (existingPhone.length > 0) {
-        return reply.status(400).send({
-          success: false,
-          error: "Phone number already registered",
-        });
-      }
-
-      // Create customer
       const customer = await userModel.customerRegister({
-        profile,
+        profile: profilePath,
         firstName,
         lastName,
-        email: email.toLowerCase(), // Store email in lowercase
+        email: email.toLowerCase(),
         phone: normalizedPhone,
         birthday,
         password,
@@ -512,7 +457,8 @@ const userController = {
         addressDetails,
       });
 
-      // Remove sensitive data from response
+      console.log("Customer created with profile path:", profilePath);
+
       const { password: _, ...customerResponse } = customer;
 
       return reply.status(201).send({
@@ -523,9 +469,18 @@ const userController = {
     } catch (err) {
       console.error("Error in customer register:", err);
 
-      // Handle specific database errors
+      if (profilePath) {
+        try {
+          const fullPath = path.join(process.cwd(), profilePath);
+          if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+          }
+        } catch (unlinkErr) {
+          console.error("Failed to delete uploaded file:", unlinkErr);
+        }
+      }
+
       if (err.code === "23505") {
-        // PostgreSQL unique violation
         return reply.status(400).send({
           success: false,
           error: "Email or phone number already exists",

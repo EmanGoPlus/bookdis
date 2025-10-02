@@ -10,8 +10,9 @@ import {
   ActivityIndicator,
   Image,
   Platform,
+  Modal,
+  FlatList,
 } from "react-native";
-import RNPickerSelect from "react-native-picker-select";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import axios from "axios";
@@ -53,6 +54,12 @@ export default function Register({ navigation }) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingRegions, setLoadingRegions] = useState(true);
 
+  // Modal states for custom dropdowns
+  const [showRegionModal, setShowRegionModal] = useState(false);
+  const [showProvinceModal, setShowProvinceModal] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [showBarangayModal, setShowBarangayModal] = useState(false);
+
   const [fontsLoaded] = useFonts({
     Roboto_800ExtraBold,
     Roboto_600SemiBold,
@@ -81,7 +88,7 @@ export default function Register({ navigation }) {
     try {
       setLoadingRegions(true);
       const response = await axios.get("https://psgc.cloud/api/regions");
-      setRegions(response.data.map((r) => ({ label: r.name, value: r.name })));
+      setRegions(response.data.map((r) => ({ label: r.name, value: r.name, code: r.code })));
     } catch (error) {
       console.error("Failed to load regions:", error);
       Alert.alert("Error", "Failed to load regions. Please check your internet connection.");
@@ -106,15 +113,13 @@ export default function Register({ navigation }) {
 
   const loadProvinces = async (regionName) => {
     try {
-      // Find the region code from the region name
-      const response = await axios.get("https://psgc.cloud/api/regions");
-      const region = response.data.find(r => r.name === regionName);
+      const region = regions.find(r => r.value === regionName);
       if (!region) return;
 
       const provincesResponse = await axios.get(
         `https://psgc.cloud/api/regions/${region.code}/provinces`
       );
-      setProvinces(provincesResponse.data.map((p) => ({ label: p.name, value: p.name })));
+      setProvinces(provincesResponse.data.map((p) => ({ label: p.name, value: p.name, code: p.code })));
       setCities([]);
       setBarangays([]);
       setSelectedProvince(null);
@@ -140,21 +145,13 @@ export default function Register({ navigation }) {
 
   const loadCities = async (provinceName) => {
     try {
-      // Find province code
-      const regionsResponse = await axios.get("https://psgc.cloud/api/regions");
-      const region = regionsResponse.data.find(r => r.name === selectedRegion);
-      if (!region) return;
-
-      const provincesResponse = await axios.get(
-        `https://psgc.cloud/api/regions/${region.code}/provinces`
-      );
-      const province = provincesResponse.data.find(p => p.name === provinceName);
+      const province = provinces.find(p => p.value === provinceName);
       if (!province) return;
 
       const citiesResponse = await axios.get(
         `https://psgc.cloud/api/provinces/${province.code}/cities-municipalities`
       );
-      setCities(citiesResponse.data.map((c) => ({ label: c.name, value: c.name })));
+      setCities(citiesResponse.data.map((c) => ({ label: c.name, value: c.name, code: c.code })));
       setBarangays([]);
       setSelectedCity(null);
       setSelectedBarangay(null);
@@ -176,21 +173,7 @@ export default function Register({ navigation }) {
 
   const loadBarangays = async (cityName) => {
     try {
-      // Find city code
-      const regionsResponse = await axios.get("https://psgc.cloud/api/regions");
-      const region = regionsResponse.data.find(r => r.name === selectedRegion);
-      if (!region) return;
-
-      const provincesResponse = await axios.get(
-        `https://psgc.cloud/api/regions/${region.code}/provinces`
-      );
-      const province = provincesResponse.data.find(p => p.name === selectedProvince);
-      if (!province) return;
-
-      const citiesResponse = await axios.get(
-        `https://psgc.cloud/api/provinces/${province.code}/cities-municipalities`
-      );
-      const city = citiesResponse.data.find(c => c.name === cityName);
+      const city = cities.find(c => c.value === cityName);
       if (!city) return;
 
       const barangaysResponse = await axios.get(
@@ -204,36 +187,24 @@ export default function Register({ navigation }) {
     }
   };
 
-  const selectProfileImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
-        base64: true,
-      });
+const selectProfileImage = async () => {
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7, // Can increase quality since we're not using base64
+    });
 
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        setProfileImage(asset.uri);
-        
-        // Convert to base64 for upload
-        if (asset.base64) {
-          setProfileImageBase64(asset.base64);
-        } else {
-          // Fallback: read file and convert to base64
-          const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          setProfileImageBase64(base64);
-        }
-      }
-    } catch (error) {
-      console.error('Error selecting image:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setProfileImage(asset.uri);
     }
-  };
+  } catch (error) {
+    console.error('Error selecting image:', error);
+    Alert.alert('Error', 'Failed to select image. Please try again.');
+  }
+};
 
   const handleChange = (key, value) => {
     setFormData({ ...formData, [key]: value });
@@ -242,7 +213,7 @@ export default function Register({ navigation }) {
   const validateForm = () => {
     // Check if all required fields are filled
     if (
-      !profileImageBase64 ||
+      !profileImage ||
       !formData.firstName.trim() ||
       !formData.lastName.trim() ||
       !formData.email.trim() ||
@@ -260,6 +231,8 @@ export default function Register({ navigation }) {
       Alert.alert("Error", "Please fill in all required fields including profile picture");
       return false;
     }
+
+    
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -288,13 +261,22 @@ export default function Register({ navigation }) {
       return false;
     }
 
+    // Validate age (must be at least 13 years old)
+    const birthDate = new Date(formData.birthday);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+    if (age < 13) {
+      Alert.alert("Error", "You must be at least 13 years old to register");
+      return false;
+    }
+
     // Validate password match
     if (formData.password !== formData.confirmPassword) {
       Alert.alert("Error", "Passwords do not match");
       return false;
     }
 
-    // Validate password strength (minimum 8 characters to match backend)
+    // Validate password strength
     if (formData.password.length < 8) {
       Alert.alert("Error", "Password must be at least 8 characters long");
       return false;
@@ -303,73 +285,95 @@ export default function Register({ navigation }) {
     return true;
   };
 
-  const handleRegister = async () => {
-    if (!validateForm()) {
-      return;
+const handleRegister = async () => {
+  if (!validateForm()) {
+    return;
+  }
+
+  try {
+    setIsLoading(true);
+
+    // Create FormData object (like in AddPromo)
+    const formDataObj = new FormData();
+    
+    // Add the profile image file
+    if (profileImage) {
+      const uriParts = profileImage.split(".");
+      const fileType = uriParts[uriParts.length - 1];
+      formDataObj.append("profile", {
+        uri: profileImage,
+        name: `profile.${fileType}`,
+        type: `image/${fileType}`,
+      });
     }
+    
+    // Add all other fields
+    formDataObj.append("firstName", formData.firstName.trim());
+    formDataObj.append("lastName", formData.lastName.trim());
+    formDataObj.append("email", formData.email.trim().toLowerCase());
+    formDataObj.append("phone", formData.phone.replace(/\D/g, ""));
+    formDataObj.append("birthday", formData.birthday);
+    formDataObj.append("password", formData.password);
+    formDataObj.append("region", selectedRegion);
+    formDataObj.append("province", selectedProvince);
+    formDataObj.append("city", selectedCity);
+    formDataObj.append("barangay", selectedBarangay);
+    formDataObj.append("postalCode", formData.postalCode.trim());
+    formDataObj.append("addressDetails", formData.addressDetails.trim());
 
-    try {
-      setIsLoading(true);
+    console.log('Sending registration request...');
 
-      const payload = {
-        profile: `data:image/jpeg;base64,${profileImageBase64}`,
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.replace(/\D/g, ""),
-        birthday: formData.birthday,
-        password: formData.password,
-        region: selectedRegion,
-        province: selectedProvince,
-        city: selectedCity,
-        barangay: selectedBarangay,
-        postalCode: formData.postalCode.trim(),
-        addressDetails: formData.addressDetails.trim(),
-      };
+    const response = await axios.post(
+      `${API_BASE_URL}/api/user/customer-register`,
+      formDataObj,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data', // Changed from application/json
+        },
+        timeout: 30000,
+      }
+    );
 
-      const response = await axios.post(
-        `${API_BASE_URL}/api/user/customer-register`,
-        payload,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
-      );
+    console.log('Registration response:', response.data);
 
-      if (response.data.success) {
-        Alert.alert(
-          "Success", 
-          "Customer registered successfully!",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                resetForm();
-                navigation.navigate('Login'); // Navigate to login screen
-              }
+    if (response.data.success) {
+      Alert.alert(
+        "Success", 
+        "Registration successful! You can now login with your credentials.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              resetForm();
+              navigation.navigate('Login');
             }
-          ]
-        );
-      } else {
-        Alert.alert("Error", response.data.error || "Registration failed");
-      }
-    } catch (error) {
-      console.error("Registration error:", error);
-      
-      let errorMessage = "Something went wrong while registering";
-      
-      if (error.response) {
-        errorMessage = error.response.data?.error || error.response.data?.message || errorMessage;
-      } else if (error.request) {
-        errorMessage = "Network error. Please check your internet connection.";
-      }
-      
-      Alert.alert("Error", errorMessage);
-    } finally {
-      setIsLoading(false);
+          }
+        ]
+      );
+    } else {
+      Alert.alert("Error", response.data.error || "Registration failed");
     }
-  };
+  } catch (error) {
+    console.error("Registration error:", error);
+    
+    let errorMessage = "Something went wrong while registering";
+    
+    if (error.response) {
+      console.log('Error response:', error.response.data);
+      errorMessage = error.response.data?.error || 
+                    error.response.data?.message || 
+                    `Server error: ${error.response.status}`;
+    } else if (error.request) {
+      errorMessage = "Network error. Please check your internet connection.";
+    } else if (error.code === 'ECONNABORTED') {
+      errorMessage = "Request timeout. Please try again.";
+    }
+    
+    Alert.alert("Registration Failed", errorMessage);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const resetForm = () => {
     setFormData({
@@ -392,6 +396,59 @@ export default function Register({ navigation }) {
     setProvinces([]);
     setCities([]);
     setBarangays([]);
+  };
+
+  // Custom Dropdown Component
+  const CustomDropdown = ({ label, value, items, onSelect, disabled, modalVisible, setModalVisible }) => {
+    return (
+      <>
+        <TouchableOpacity
+          style={[styles.dropdown, disabled && styles.dropdownDisabled]}
+          onPress={() => !disabled && setModalVisible(true)}
+          disabled={disabled}
+        >
+          <Text style={[styles.dropdownText, !value && styles.dropdownPlaceholder]}>
+            {value || label}
+          </Text>
+          <Text style={styles.dropdownArrow}>▼</Text>
+        </TouchableOpacity>
+
+        <Modal
+          visible={modalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{label}</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Text style={styles.modalClose}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <FlatList
+                data={items}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.modalItem}
+                    onPress={() => {
+                      onSelect(item.value);
+                      setModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.modalItemText}>{item.label}</Text>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+              />
+            </View>
+          </View>
+        </Modal>
+      </>
+    );
   };
 
   if (!fontsLoaded || loadingRegions) {
@@ -492,39 +549,44 @@ export default function Register({ navigation }) {
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Address Information</Text>
             
-            <RNPickerSelect
-              placeholder={{ label: "Select Region *", value: null }}
-              items={regions}
+            <CustomDropdown
+              label="Select Region *"
               value={selectedRegion}
-              onValueChange={(val) => setSelectedRegion(val)}
-              style={pickerStyles}
+              items={regions}
+              onSelect={setSelectedRegion}
+              disabled={false}
+              modalVisible={showRegionModal}
+              setModalVisible={setShowRegionModal}
             />
             
-            <RNPickerSelect
-              placeholder={{ label: "Select Province *", value: null }}
-              items={provinces}
+            <CustomDropdown
+              label="Select Province *"
               value={selectedProvince}
-              onValueChange={(val) => setSelectedProvince(val)}
-              style={pickerStyles}
+              items={provinces}
+              onSelect={setSelectedProvince}
               disabled={!selectedRegion}
+              modalVisible={showProvinceModal}
+              setModalVisible={setShowProvinceModal}
             />
             
-            <RNPickerSelect
-              placeholder={{ label: "Select City/Municipality *", value: null }}
-              items={cities}
+            <CustomDropdown
+              label="Select City/Municipality *"
               value={selectedCity}
-              onValueChange={(val) => setSelectedCity(val)}
-              style={pickerStyles}
+              items={cities}
+              onSelect={setSelectedCity}
               disabled={!selectedProvince}
+              modalVisible={showCityModal}
+              setModalVisible={setShowCityModal}
             />
             
-            <RNPickerSelect
-              placeholder={{ label: "Select Barangay *", value: null }}
-              items={barangays}
+            <CustomDropdown
+              label="Select Barangay *"
               value={selectedBarangay}
-              onValueChange={(val) => setSelectedBarangay(val)}
-              style={pickerStyles}
+              items={barangays}
+              onSelect={setSelectedBarangay}
               disabled={!selectedCity}
+              modalVisible={showBarangayModal}
+              setModalVisible={setShowBarangayModal}
             />
 
             <TextInput
@@ -539,7 +601,7 @@ export default function Register({ navigation }) {
             
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Complete Address Details *"
+              placeholder="Complete Address Details (House #, Street, etc.) *"
               placeholderTextColor="#666"
               multiline
               numberOfLines={3}
@@ -582,6 +644,16 @@ export default function Register({ navigation }) {
             ) : (
               <Text style={styles.registerButtonText}>Register</Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.loginLink}
+            onPress={() => navigation.navigate('Login')}
+            disabled={isLoading}
+          >
+            <Text style={styles.loginLinkText}>
+              Already have an account? Login here
+            </Text>
           </TouchableOpacity>
 
           <Text style={styles.requiredText}>* Required fields</Text>
@@ -665,6 +737,77 @@ const styles = StyleSheet.create({
     height: 80,
     paddingTop: 15,
   },
+  dropdown: {
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dropdownDisabled: {
+    opacity: 0.6,
+    backgroundColor: "rgba(200, 200, 200, 0.95)",
+  },
+  dropdownText: {
+    fontSize: 16,
+    fontFamily: "Roboto_400Regular",
+    color: "#000",
+    flex: 1,
+  },
+  dropdownPlaceholder: {
+    color: "#666",
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: "#666",
+    marginLeft: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Roboto_600SemiBold",
+    color: "#4F0CBD",
+  },
+  modalClose: {
+    fontSize: 24,
+    color: "#666",
+    fontFamily: "Roboto_400Regular",
+  },
+  modalItem: {
+    padding: 16,
+  },
+  modalItemText: {
+    fontSize: 16,
+    fontFamily: "Roboto_400Regular",
+    color: "#000",
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#eee',
+  },
   registerButton: {
     backgroundColor: "#fff",
     padding: 15,
@@ -688,6 +831,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: "Roboto_600SemiBold",
   },
+  loginLink: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  loginLinkText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Roboto_400Regular",
+    textDecorationLine: 'underline',
+  },
   requiredText: {
     color: "rgba(255, 255, 255, 0.8)",
     fontSize: 14,
@@ -702,30 +855,3 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
-
-const pickerStyles = {
-  inputIOS: {
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    fontSize: 16,
-    color: "#000",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-  },
-  inputAndroid: {
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    fontSize: 16,
-    color: "#000",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
-  },
-  placeholder: {
-    color: "#666",
-    fontSize: 16,
-  },
-};

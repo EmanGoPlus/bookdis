@@ -18,6 +18,7 @@ import axios from "axios";
 import io from "socket.io-client";
 import { API_BASE_URL } from "../../apiConfig";
 import QRCode from 'react-native-qrcode-svg';
+import { useIsFocused } from "@react-navigation/native";
 
 const { width } = Dimensions.get('window');
 
@@ -29,14 +30,15 @@ export default function Home({ navigation }) {
   const [claimedPromoData, setClaimedPromoData] = useState(null);
   const [claimedPromos, setClaimedPromos] = useState({});
   
-  // New state for success modal
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [redeemedPromoTitle, setRedeemedPromoTitle] = useState("");
   const [checkmarkScale] = useState(new Animated.Value(0));
   
-  // ✅ Add refs to track current state for socket handlers
   const qrModalVisibleRef = useRef(false);
   const claimedPromoDataRef = useRef(null);
+
+  const [friends, setFriends] = useState([]);
+  const isFocused = useIsFocused();
   
   const {
     customer,
@@ -45,7 +47,45 @@ export default function Home({ navigation }) {
   } = useContext(CustomerContext);
   const [socket, setSocket] = useState(null);
 
-  // ✅ Update refs whenever state changes
+  // inside Home component, top level (not in renderPromo)
+useEffect(() => {
+  if (customer?.id && customer?.token && isFocused) {
+    fetchFriends();
+  }
+}, [customer, isFocused]);
+
+const fetchFriends = async () => {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/api/user/customer/friends/${customer.id}`,
+      {
+        headers: { Authorization: `Bearer ${customer.token}` },
+      }
+    );
+
+    if (response.data.success) {
+      setFriends(response.data.data);
+    } else {
+      setFriends([]);
+    }
+  } catch (error) {
+    console.error("Error fetching friends:", error);
+    setFriends([]);
+  }
+};
+
+  const renderFriend = ({ item }) => (
+    <View style={styles.friendCard}>
+      <Image
+        source={{ uri: `${API_BASE_URL}/${item.profilePic}` }}
+        style={styles.friendAvatar}
+      />
+      <Text style={styles.friendName} numberOfLines={1}>
+        {item.firstName}
+      </Text>
+    </View>
+  );
+
   useEffect(() => {
     qrModalVisibleRef.current = qrModalVisible;
   }, [qrModalVisible]);
@@ -95,10 +135,8 @@ export default function Home({ navigation }) {
       console.log("👤 Customer ID:", customer.id);
       console.log("🚪 Joining room:", roomName);
       
-      // Join the customer-specific room
       newSocket.emit("join-room", roomName);
       
-      // Confirm room join (if your backend sends confirmation)
       newSocket.on("room-joined", (data) => {
         console.log("✅ Successfully joined room:", data);
       });
@@ -124,12 +162,10 @@ export default function Home({ navigation }) {
       fetchPromos();
     });
 
-    // Enhanced promoRedeemed handler with auto-close QR and success modal
     newSocket.on("promoRedeemed", (data) => {
       console.log("🎉 === PROMO REDEEMED EVENT RECEIVED ===");
       console.log("Event data:", JSON.stringify(data, null, 2));
       
-      // ✅ Use refs to get current state values
       const isModalOpen = qrModalVisibleRef.current;
       const currentClaimData = claimedPromoDataRef.current;
       
@@ -169,10 +205,8 @@ export default function Home({ navigation }) {
         setQrModalVisible(false);
         setClaimedPromoData(null);
         
-        // Set the redeemed promo title for success modal
         setRedeemedPromoTitle(promoTitle);
         
-        // Show success modal after a brief delay
         setTimeout(() => {
           console.log("✅ SHOWING SUCCESS MODAL");
           setSuccessModalVisible(true);
@@ -183,7 +217,6 @@ export default function Home({ navigation }) {
         console.log("   This means the ref wasn't updated or modal wasn't actually open");
       }
 
-      // Always refresh the promo list
       fetchPromos();
     });
 
@@ -368,7 +401,6 @@ export default function Home({ navigation }) {
       setClaimedPromoData(dataToSet);
       setQrModalVisible(true);
       
-      // ✅ Manually update refs immediately (don't wait for useEffect)
       qrModalVisibleRef.current = true;
       claimedPromoDataRef.current = dataToSet;
       
@@ -414,6 +446,9 @@ export default function Home({ navigation }) {
     const claimData = claimedPromos[item.promoId];
     const isClaimed = !!claimData;
     const isRedeemed = claimData?.isRedeemed || false;
+
+ 
+
     
     return (
       <View style={styles.promoCard}>
@@ -521,6 +556,20 @@ export default function Home({ navigation }) {
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
       </View>
+
+        {friends.length > 0 && (
+        <View style={{ paddingVertical: 10 }}>
+          <Text style={styles.sectionTitle}>Your Friends</Text>
+          <FlatList
+            data={friends}
+            renderItem={renderFriend}
+            keyExtractor={(item) => item.id.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 10 }}
+          />
+        </View>
+      )}
 
       <View style={styles.content}>
         {loading && !refreshing ? (
@@ -1024,6 +1073,30 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+    textAlign: "center",
+  },
+    sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 10,
+    paddingHorizontal: 16,
+  },
+  friendCard: {
+    alignItems: "center",
+    marginRight: 12,
+    width: 70,
+  },
+  friendAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#ddd",
+    marginBottom: 6,
+  },
+  friendName: {
+    fontSize: 12,
+    color: "#333",
     textAlign: "center",
   },
 });

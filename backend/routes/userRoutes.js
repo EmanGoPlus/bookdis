@@ -4,6 +4,7 @@ import creditController from "../controllers/creditController.js";
 import permissionController from "../controllers/permissionController.js";
 import promoController from "../controllers/promoController.js";
 import membershipController from "../controllers/membershipController.js";
+import friendController from "../controllers/friendController.js";
 import authenticateToken from "../middlewares/auth.js";
 import fastifyMultipart from "@fastify/multipart";
 
@@ -22,7 +23,7 @@ async function userRoutes(fastify, options) {
 
   fastify.post("/login", userController.combinedLogin);
 
-  fastify.post("/register", userController.merchantRegister); //fix the name next week
+  fastify.post("/register", userController.merchantRegister); //fix the name next week // hahahha hindi pa rin naayos tagal na nyan ah!
 
   fastify.post("/employee-register", userController.employeeRegister);
 
@@ -146,6 +147,34 @@ async function userRoutes(fastify, options) {
     "/api/membership/deactivate",
     membershipController.deactivateMembership
   );
+
+  //=============================FRIENDS=============================
+
+   fastify.post("/customer/friends/send", {
+    preHandler: authenticateToken,
+    handler: friendController.sendFriendRequest,
+  });
+
+  // Get Friends of a User
+  fastify.get("/customer/friends/:customerId", {
+    preHandler: authenticateToken,
+    handler: friendController.getFriends,
+  });
+
+  fastify.put("/customer/friends/accept/:requestId", {
+    preHandler: authenticateToken,
+    handler: friendController.acceptFriendRequest,
+  });
+
+  fastify.delete("/customer/friends/reject/:requestId", {
+    preHandler: authenticateToken,
+    handler: friendController.rejectFriendRequest,
+  });
+
+  fastify.get("/customer/friends/pending/:customerId", {
+    preHandler: authenticateToken,
+    handler: friendController.getPendingRequests,
+  });
 }
 
 export default userRoutes;

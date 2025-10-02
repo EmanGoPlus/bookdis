@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, integer, boolean, timestamp, text, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, integer, boolean, timestamp, text, date, unique } from "drizzle-orm/pg-core";
 
 // ----------------------
 // Merchants (owners)
@@ -62,10 +62,13 @@ export const customerMemberships = pgTable("tbl_customer_memberships", {
   id: serial("id").primaryKey(),
   customerId: integer("customer_id").references(() => customers.id).notNull(),
   businessId: integer("business_id").references(() => businesses.id).notNull(),
-  membershipLevel: varchar("membership_level", { length: 50 }), // regular, gold, vip
+  membershipLevel: varchar("membership_level", { length: 50 }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  unique("unique_customer_business").on(table.customerId, table.businessId),
+]);
+
 
 // ----------------------
 // Businesses
@@ -202,8 +205,6 @@ export const products = pgTable("tbl_products", {
 // Promos
 // ----------------------
 
-// ================= PROMOS =================
-
 export const promos = pgTable("tbl_promos", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").references(() => businesses.id).notNull(),
@@ -239,6 +240,8 @@ export const claimedPromos = pgTable("tbl_claimed_promos", {
 
   isRedeemed: boolean("is_redeemed").default(false),
   redeemedAt: timestamp("redeemed_at"),
+isShared: boolean("is_shared").default(false).notNull(),
+sharedAt: timestamp("shared_at"),
 
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -246,12 +249,17 @@ export const claimedPromos = pgTable("tbl_claimed_promos", {
 
 export const sharedPromos = pgTable("tbl_shared_promos", {
   id: serial("id").primaryKey(),
+
   promoId: integer("promo_id").references(() => promos.id).notNull(),
+  claimedPromoId: integer("claimed_promo_id").references(() => claimedPromos.id).notNull(),
 
   fromCustomerId: integer("from_customer_id").references(() => customers.id).notNull(),
   toCustomerId: integer("to_customer_id").references(() => customers.id).notNull(),
 
   qrCode: varchar("qr_code", { length: 255 }).notNull(),
+
+  // <-- This mirrors tbl_promos.endDate
+  qrExpiresAt: timestamp("qr_expires_at").notNull(),
 
   isRedeemed: boolean("is_redeemed").default(false),
   redeemedBy: integer("redeemed_by").references(() => customers.id),
@@ -259,4 +267,15 @@ export const sharedPromos = pgTable("tbl_shared_promos", {
 
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+
+export const friends = pgTable("tbl_friends", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  friendId: integer("friend_id").references(() => customers.id).notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique("unique_friend_pair").on(table.customerId, table.friendId),
+]);
 
