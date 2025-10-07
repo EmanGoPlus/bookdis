@@ -469,7 +469,6 @@ const promoController = {
     }
   },
 
-  // In promoController.js - REPLACE the entire sharePromo method with this:
 async sharePromo(request, reply) {
   try {
     const customerId = request.user.id;

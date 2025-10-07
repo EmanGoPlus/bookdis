@@ -8,12 +8,17 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
+  Modal,
+  Dimensions,
 } from "react-native";
 import axios from "axios";
 import { CustomerContext } from "../../context/AuthContext";
 import { API_BASE_URL } from "../../apiConfig";
 import { useNavigation } from "@react-navigation/native";
 import Svg, { Path } from "react-native-svg";
+import QRCode from "react-native-qrcode-svg";
+
+const { width } = Dimensions.get("window");
 
 const RecievedPromos = () => {
   const { customer } = useContext(CustomerContext);
@@ -22,6 +27,8 @@ const RecievedPromos = () => {
 
   const [receivedPromos, setReceivedPromos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [qrModalVisible, setQrModalVisible] = useState(false);
+  const [selectedPromo, setSelectedPromo] = useState(null);
 
   // Fetch received promos
   const fetchReceivedPromos = async () => {
@@ -58,12 +65,25 @@ const RecievedPromos = () => {
 
   const handleShowQR = (promo) => {
     console.log("📱 Showing QR for promo:", promo);
-    navigation.navigate("ShowQRScreen", { promo });
+    setSelectedPromo(promo);
+    setQrModalVisible(true);
   };
 
-  const handleShare = (promo) => {
-    console.log("📤 Sharing promo:", promo);
-    Alert.alert("Shared!", `Promo "${promo.promoTitle}" shared successfully!`);
+  const closeQrModal = () => {
+    setQrModalVisible(false);
+    setSelectedPromo(null);
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const renderPromo = ({ item }) => {
@@ -193,6 +213,76 @@ const RecievedPromos = () => {
         renderItem={renderPromo}
         contentContainerStyle={styles.listContainer}
       />
+
+      {/* QR Code Modal */}
+      <Modal
+        visible={qrModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={closeQrModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Shared Promo QR Code</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeQrModal}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {selectedPromo && (
+              <View style={styles.modalContent}>
+                <Text style={styles.promoTitleModal}>
+                  {selectedPromo.promoTitle || "Untitled Promo"}
+                </Text>
+                <Text style={styles.businessNameModal}>
+                  {selectedPromo.businessName || "Unknown Business"}
+                </Text>
+
+                {selectedPromo.qrCode ? (
+                  <View style={styles.qrContainer}>
+                    <Text style={styles.qrLabel}>
+                      Show this QR code to redeem:
+                    </Text>
+                    <QRCode value={selectedPromo.qrCode} size={200} />
+                  </View>
+                ) : (
+                  <View style={styles.noQrContainer}>
+                    <Text style={styles.noQrText}>
+                      No QR code available for this promo
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.promoDetails}>
+                  <Text style={styles.detailLabel}>Shared by:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedPromo.senderName || "Unknown"}
+                  </Text>
+                  
+                  {selectedPromo.sharedAt && (
+                    <>
+                      <Text style={styles.detailLabel}>Shared on:</Text>
+                      <Text style={styles.detailValue}>
+                        {formatDateTime(selectedPromo.sharedAt)}
+                      </Text>
+                    </>
+                  )}
+                </View>
+
+                {selectedPromo.qrCode && (
+                  <Text style={styles.instructionText}>
+                    Present this QR code at the business to redeem your promo!
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -303,27 +393,13 @@ const styles = StyleSheet.create({
   qrButton: {
     backgroundColor: "#4F0CBD",
     borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    marginBottom: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
   qrText: {
     color: "#fff",
     fontSize: 13,
     fontWeight: "600",
-  },
-  shareButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#28a745",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-  },
-  shareText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 13,
   },
   backContainer: {
     paddingHorizontal: 16,
@@ -331,5 +407,114 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    width: width * 0.9,
+    maxHeight: "80%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e9ecef",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    flex: 1,
+  },
+  closeButton: {
+    padding: 5,
+  },
+  closeButtonText: {
+    fontSize: 20,
+    color: "#666",
+    fontWeight: "bold",
+  },
+  modalContent: {
+    padding: 20,
+    alignItems: "center",
+  },
+  promoTitleModal: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  businessNameModal: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  qrContainer: {
+    alignItems: "center",
+    marginBottom: 20,
+    padding: 20,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+  },
+  qrLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  noQrContainer: {
+    alignItems: "center",
+    padding: 40,
+    marginBottom: 20,
+  },
+  noQrText: {
+    fontSize: 16,
+    color: "#999",
+    textAlign: "center",
+  },
+  promoDetails: {
+    width: "100%",
+    backgroundColor: "#f8f9fa",
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "600",
+    marginTop: 8,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: "#333",
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  instructionText: {
+    fontSize: 14,
+    color: "#4F0CBD",
+    textAlign: "center",
+    fontWeight: "500",
+    paddingHorizontal: 20,
   },
 });

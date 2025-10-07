@@ -183,7 +183,6 @@ const promoModel = {
     return await db.transaction(async (tx) => {
       console.log("🔒 Starting transaction for QR:", qrCode);
 
-      // 1. Lock the claim row for update
       const claim = await tx
         .select({
           claimId: claimedPromos.id,
@@ -200,7 +199,7 @@ const promoModel = {
         .innerJoin(promos, eq(claimedPromos.promoId, promos.id))
         .innerJoin(customers, eq(claimedPromos.customerId, customers.id))
         .where(eq(claimedPromos.qrCode, qrCode))
-        .for("update") // ✅ PostgreSQL row lock
+        .for("update")
         .limit(1);
 
       console.log("📋 Claim found:", claim.length > 0 ? "YES" : "NO");
@@ -220,19 +219,16 @@ const promoModel = {
 
       const now = new Date();
 
-      // 2. Check if already redeemed (with strict check)
       if (c.isRedeemed === true) {
         console.log("❌ Already redeemed at:", c.redeemedAt);
         throw new Error("Promo has already been redeemed");
       }
 
-      // 3. Check expiration (if set)
       if (c.qrExpiresAt && c.qrExpiresAt < now) {
         console.log("❌ QR expired at:", c.qrExpiresAt);
         throw new Error("QR code has expired");
       }
 
-      // 4. Mark as redeemed
       console.log("✅ Marking as redeemed...");
       const [redeemed] = await tx
         .update(claimedPromos)
