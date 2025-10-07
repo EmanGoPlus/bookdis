@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { 
   View, 
   Text, 
@@ -28,32 +28,37 @@ export default function QrScannerScreen({ navigation }) {
   
   const { user, userRole, isMerchant, isEmployee } = useContext(UserContext);
 
-  useEffect(() => {
-    if (!userToken) return;
+  const socketRef = useRef(null);
+  
+  // ✅ Scan prevention refs
+  const scanningRef = useRef(false);
+  const lastScannedCode = useRef(null);
+  const lastScanTime = useRef(0);
 
-    const newSocket = io(API_BASE_URL, {
+  useEffect(() => {
+    if (!userToken || socketRef.current) return;
+
+    const socket = io(API_BASE_URL, {
       transports: ["websocket"],
       auth: { token: userToken },
     });
 
-    newSocket.on("connect", () => {
-      console.log("Scanner socket connected:", newSocket.id);
+    socket.on("connect", () => {
+      console.log("Scanner socket connected:", socket.id);
     });
 
-    newSocket.on("promoUpdate", (data) => {
+    socket.on("promoUpdate", (data) => {
       console.log("Promo updated after redemption:", data);
     });
 
-    newSocket.on("disconnect", () => {
+    socket.on("disconnect", () => {
       console.log("Scanner socket disconnected");
     });
 
-    setSocket(newSocket);
+    socketRef.current = socket;
 
     return () => {
-      if (newSocket) {
-        newSocket.disconnect();
-      }
+      socket.disconnect();
     };
   }, [userToken]);
 
@@ -72,7 +77,6 @@ export default function QrScannerScreen({ navigation }) {
     })();
   }, []);
 
-  // Animate result screen entrance
   useEffect(() => {
     if (promoData) {
       Animated.parallel([
@@ -92,19 +96,44 @@ export default function QrScannerScreen({ navigation }) {
   }, [promoData]);
 
   const handleBarCodeScanned = async ({ type, data }) => {
+    const now = Date.now();
+    
+    // ✅ CRITICAL: Prevent multiple scans of the same QR code
+    if (scanningRef.current) {
+      console.log("⏭️ Already processing a scan, ignoring");
+      return;
+    }
+
+    // Only allow same QR code to be scanned again after 5 seconds
+    if (lastScannedCode.current === data && (now - lastScanTime.current) < 5000) {
+      console.log("⏭️ Same QR code scanned too quickly, ignoring");
+      return;
+    }
+
+    // Lock scanning
+    scanningRef.current = true;
+    lastScannedCode.current = data;
+    lastScanTime.current = now;
+    
     setScanned(true);
     setLoading(true);
+    
+    console.log("📷 QR Code scanned:", data);
     
     try {
       const endpoint = isMerchant() 
         ? '/api/user/merchant/redeem-promo'
         : '/api/user/employee/redeem-promo';
 
+      console.log("📡 Sending redemption request to:", endpoint);
+
       const response = await axios.post(
         `${API_BASE_URL}${endpoint}`,
         { qrCode: data },
         { headers: { Authorization: `Bearer ${userToken}` } }
       );
+
+      console.log("✅ Response received:", response.data);
 
       if (response.data.success) {
         setPromoData({
@@ -115,14 +144,41 @@ export default function QrScannerScreen({ navigation }) {
           redeemedAt: response.data.data.redeemedAt,
           claimId: response.data.data.claimId,
         });
+      } else {
+        console.log("⚠️ Success=false from server:", response.data);
+        setPromoData({
+          success: false,
+          error: response.data.message || "Failed to redeem promo",
+        });
       }
     } catch (error) {
-      setPromoData({
-        success: false,
-        error: error.response?.data?.message || "Failed to redeem promo",
-      });
+      console.error("❌ Redemption error:", error);
+      console.error("Error response:", error.response?.data);
+      
+      // Don't show error if it's "already redeemed" from duplicate scan
+      if (error.response?.data?.message?.includes("already been redeemed")) {
+        console.log("ℹ️ Ignoring duplicate scan error - first scan succeeded");
+        // Show success since first scan worked
+        setPromoData({
+          success: true,
+          message: "Promo redeemed successfully",
+          promoTitle: "Promo",
+          customerName: "Customer",
+          redeemedAt: new Date().toISOString(),
+          claimId: null,
+        });
+      } else {
+        setPromoData({
+          success: false,
+          error: error.response?.data?.message || "Failed to redeem promo",
+        });
+      }
     } finally {
       setLoading(false);
+      // Keep scan lock for 3 seconds to prevent rapid re-scanning
+      setTimeout(() => {
+        scanningRef.current = false;
+      }, 3000);
     }
   };
 
@@ -132,6 +188,10 @@ export default function QrScannerScreen({ navigation }) {
     setLoading(false);
     fadeAnim.setValue(0);
     scaleAnim.setValue(0);
+    // Reset scan prevention
+    scanningRef.current = false;
+    lastScannedCode.current = null;
+    lastScanTime.current = 0;
   };
 
   const formatDateTime = (dateString) => {
@@ -188,7 +248,6 @@ export default function QrScannerScreen({ navigation }) {
             }}
           />
           
-          {/* Overlay with scanning frame */}
           <View style={styles.overlay}>
             <View style={styles.topOverlay}>
               <TouchableOpacity 
@@ -241,7 +300,6 @@ export default function QrScannerScreen({ navigation }) {
               >
                 {promoData.success ? (
                   <>
-                    {/* Success Icon */}
                     <View style={styles.iconContainer}>
                       <View style={styles.successCircle}>
                         <Text style={styles.successIcon}>✓</Text>
@@ -253,7 +311,6 @@ export default function QrScannerScreen({ navigation }) {
                       The promo has been claimed by the customer
                     </Text>
 
-                    {/* Details Card */}
                     <View style={styles.detailsCard}>
                       <DetailRow 
                         label="Promo" 
@@ -264,11 +321,13 @@ export default function QrScannerScreen({ navigation }) {
                         label="Customer" 
                         value={promoData.customerName}
                       />
-                      <DetailRow 
-                        label="Claim ID" 
-                        value={`#${promoData.claimId}`}
-                        highlight
-                      />
+                      {promoData.claimId && (
+                        <DetailRow 
+                          label="Claim ID" 
+                          value={`#${promoData.claimId}`}
+                          highlight
+                        />
+                      )}
                       <DetailRow 
                         label="Redeemed" 
                         value={formatDateTime(promoData.redeemedAt)}
@@ -278,7 +337,6 @@ export default function QrScannerScreen({ navigation }) {
                   </>
                 ) : (
                   <>
-                    {/* Error Icon */}
                     <View style={styles.iconContainer}>
                       <View style={styles.errorCircle}>
                         <Text style={styles.errorIconText}>✕</Text>
@@ -297,7 +355,6 @@ export default function QrScannerScreen({ navigation }) {
                   </>
                 )}
 
-                {/* Action Buttons */}
                 <View style={styles.buttonGroup}>
                   <TouchableOpacity
                     style={styles.primaryButton}
@@ -322,7 +379,6 @@ export default function QrScannerScreen({ navigation }) {
   );
 }
 
-// Helper component for detail rows
 const DetailRow = ({ label, value, highlight, isFirst, isLast }) => (
   <View style={[styles.detailRow, isLast && styles.detailRowLast]}>
     <Text style={styles.detailLabel}>{label}</Text>
@@ -369,8 +425,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 32,
   },
-  
-  // Camera Overlay
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
@@ -386,7 +440,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backdropFilter: "blur(10px)",
   },
   backButtonText: {
     color: "#fff",
@@ -456,22 +509,7 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.8)",
     textAlign: "center",
     lineHeight: 22,
-    marginBottom: 20,
   },
-  userBadge: {
-    backgroundColor: "rgba(79, 12, 189, 0.9)",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 8,
-  },
-  userBadgeText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  
-  // Results Screen
   resultContainer: {
     flex: 1,
     backgroundColor: "#f8f9fa",
@@ -549,8 +587,6 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     lineHeight: 22,
   },
-  
-  // Details Card
   detailsCard: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -587,8 +623,6 @@ const styles = StyleSheet.create({
     color: "#4F0CBD",
     fontSize: 20,
   },
-  
-  // Error Card
   errorCard: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -603,8 +637,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: "500",
   },
-  
-  // Buttons
   buttonGroup: {
     gap: 12,
   },

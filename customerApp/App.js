@@ -8,9 +8,12 @@ import { ActivityIndicator, View, StyleSheet } from "react-native";
 import Landing from "./pages/Public/Landing";
 import Login from "./pages/Public/Login";
 import Register from "./pages/Public/Register";
+
 // import PartnerMap from "./pages/Public/Mapbox";
 
 import Home from "./pages/Dashboard/Home";
+import AddFriend from "./pages/Dashboard/AddFriend"
+import ClaimedPromos from "./pages/Dashboard/ClaimedPromos"
 
 const Stack = createNativeStackNavigator();
 
@@ -52,6 +55,8 @@ function CustomerNavigator() {
         ) : (
           <>
             <Stack.Screen name="Home" component={Home} />
+             <Stack.Screen name="AddFriend" component={AddFriend} />
+                <Stack.Screen name="ClaimedPromos" component={ClaimedPromos} />
             {/* <Stack.Screen name="Map" component={PartnerMap} /> */}
           </>
         )}

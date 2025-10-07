@@ -1,7 +1,7 @@
 import friendModel from "../models/friendModel.js";
 
 const friendController = {
-  async sendFriendRequest(request, reply) {
+  async addFriend(request, reply) {
     try {
       const { customerId, friendId } = request.body;
 
@@ -15,47 +15,32 @@ const friendController = {
       if (customerId === friendId) {
         return reply.status(400).send({
           success: false,
-          message: "You cannot send a request to yourself.",
+          message: "You cannot add yourself as a friend.",
         });
       }
 
-      // check if there’s already a relation
-      const existing = await friendModel.checkExistingRequests(customerId, friendId);
+      // Check if already bookmarked
+      const existing = await friendModel.checkExistingFriendship(
+        customerId,
+        friendId
+      );
 
       if (existing.length > 0) {
-        const relation = existing[0];
-
-        if (relation.status === "pending") {
-          return reply.status(409).send({
-            success: false,
-            message: "Friend request already pending.",
-          });
-        }
-
-        if (relation.status === "accepted") {
-          return reply.status(409).send({
-            success: false,
-            message: "You are already friends.",
-          });
-        }
-
-        if (relation.status === "blocked") {
-          return reply.status(403).send({
-            success: false,
-            message: "You cannot send a request. One of you has blocked the other.",
-          });
-        }
+        return reply.status(409).send({
+          success: false,
+          message: "You have already added this friend.",
+        });
       }
 
-      const result = await friendModel.sendFriendRequest(customerId, friendId);
+      const result = await friendModel.addFriend(customerId, friendId);
 
       return reply.status(201).send({
         success: true,
-        message: "Friend request sent successfully.",
+        message: "Friend added successfully.",
         data: result,
       });
     } catch (err) {
-      console.error("Error sending friend request:", err);
+      console.error("Error adding friend:", err);
       return reply.status(500).send({
         success: false,
         error: err.message,
@@ -89,33 +74,32 @@ const friendController = {
     }
   },
 
-  async acceptFriendRequest(request, reply) {
+  async removeFriend(request, reply) {
     try {
-      const { requestId } = request.params;
+      const { customerId, friendId } = request.params;
 
-      if (!requestId) {
+      if (!customerId || !friendId) {
         return reply.status(400).send({
           success: false,
-          message: "Missing requestId.",
+          message: "Missing customerId or friendId.",
         });
       }
 
-      const result = await friendModel.acceptFriendRequest(requestId);
+      const result = await friendModel.removeFriend(customerId, friendId);
 
       if (!result) {
         return reply.status(404).send({
           success: false,
-          message: "Friend request not found.",
+          message: "Friend not found.",
         });
       }
 
       return reply.send({
         success: true,
-        message: "Friend request accepted.",
-        data: result,
+        message: "Friend removed successfully.",
       });
     } catch (err) {
-      console.error("Error accepting friend request:", err);
+      console.error("Error removing friend:", err);
       return reply.status(500).send({
         success: false,
         error: err.message,
@@ -123,32 +107,32 @@ const friendController = {
     }
   },
 
-  async rejectFriendRequest(request, reply) {
+  async searchByCustomerCode(request, reply) {
     try {
-      const { requestId } = request.params;
+      const { customerCode } = request.params;
 
-      if (!requestId) {
+      if (!customerCode) {
         return reply.status(400).send({
           success: false,
-          message: "Missing requestId.",
+          message: "Customer code is required.",
         });
       }
 
-      const result = await friendModel.rejectFriendRequest(requestId);
+      const customer = await friendModel.findByCustomerCode(customerCode);
 
-      if (!result) {
+      if (!customer) {
         return reply.status(404).send({
           success: false,
-          message: "Friend request not found.",
+          message: "Customer not found.",
         });
       }
 
       return reply.send({
         success: true,
-        message: "Friend request rejected.",
+        data: customer,
       });
     } catch (err) {
-      console.error("Error rejecting friend request:", err);
+      console.error("Error searching customer:", err);
       return reply.status(500).send({
         success: false,
         error: err.message,
@@ -156,31 +140,38 @@ const friendController = {
     }
   },
 
-  async getPendingRequests(request, reply) {
-    try {
-      const { customerId } = request.params;
+  async searchByPhone(request, reply) {
+  try {
+    const { phone } = request.params;
 
-      if (!customerId) {
-        return reply.status(400).send({
-          success: false,
-          message: "Missing customerId.",
-        });
-      }
-
-      const requests = await friendModel.getPendingRequests(customerId);
-
-      return reply.send({
-        success: true,
-        data: requests,
-      });
-    } catch (err) {
-      console.error("Error fetching pending requests:", err);
-      return reply.status(500).send({
+    if (!phone) {
+      return reply.status(400).send({
         success: false,
-        error: err.message,
+        message: "Phone number is required.",
       });
     }
-  },
+
+    const customer = await friendModel.findByPhone(phone);
+
+    if (!customer) {
+      return reply.status(404).send({
+        success: false,
+        message: "Customer not found.",
+      });
+    }
+
+    return reply.send({
+      success: true,
+      data: customer,
+    });
+  } catch (err) {
+    console.error("Error searching customer:", err);
+    return reply.status(500).send({
+      success: false,
+      error: err.message,
+    });
+  }
+}
 };
 
 export default friendController;

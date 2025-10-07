@@ -193,7 +193,7 @@ const selectProfileImage = async () => {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7, // Can increase quality since we're not using base64
+      quality: 0.7,
     });
 
     if (!result.canceled && result.assets[0]) {

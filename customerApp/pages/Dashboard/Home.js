@@ -19,10 +19,13 @@ import io from "socket.io-client";
 import { API_BASE_URL } from "../../apiConfig";
 import QRCode from 'react-native-qrcode-svg';
 import { useIsFocused } from "@react-navigation/native";
+import Svg, { Path, Line } from "react-native-svg";
+import { useNavigation } from '@react-navigation/native';
+import Header from "../../components/header";
 
 const { width } = Dimensions.get('window');
 
-export default function Home({ navigation }) {
+export default function Home() {
   const [promos, setPromos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,6 +42,9 @@ export default function Home({ navigation }) {
 
   const [friends, setFriends] = useState([]);
   const isFocused = useIsFocused();
+
+   const navigation = useNavigation();
+
   
   const {
     customer,
@@ -47,7 +53,6 @@ export default function Home({ navigation }) {
   } = useContext(CustomerContext);
   const [socket, setSocket] = useState(null);
 
-  // inside Home component, top level (not in renderPromo)
 useEffect(() => {
   if (customer?.id && customer?.token && isFocused) {
     fetchFriends();
@@ -85,6 +90,20 @@ const fetchFriends = async () => {
       </Text>
     </View>
   );
+
+  // ✅ Add effect to watch for redeemed status changes while modal is open
+  useEffect(() => {
+    if (qrModalVisible && claimedPromoData) {
+      const promoId = claimedPromoData.promoId;
+      const currentClaimData = claimedPromos[promoId];
+      
+      // If the claim became redeemed while modal was open, close it
+      if (currentClaimData?.isRedeemed === true && claimedPromoData.isRedeemed !== true) {
+        console.log("⚠️ Detected redemption while modal open, auto-closing");
+        closeQrModal();
+      }
+    }
+  }, [claimedPromos, qrModalVisible, claimedPromoData]);
 
   useEffect(() => {
     qrModalVisibleRef.current = qrModalVisible;
@@ -172,15 +191,15 @@ const fetchFriends = async () => {
       console.log("📍 Ref values at event time:");
       console.log("  - qrModalVisibleRef.current:", isModalOpen);
       console.log("  - claimedPromoDataRef.current:", currentClaimData);
-      console.log("  - Has claim data:", !!currentClaimData);
       console.log("  - Event promoId:", data.promoId);
       console.log("  - Event claimId:", data.claimId);
 
       // Get promo title
-      const promoTitle = currentClaimData?.promoTitle || 'Promo';
+      const promoTitle = currentClaimData?.promoTitle || data.promoTitle || 'Promo';
 
-      // Update the claimed promos state
+      // ✅ CRITICAL: Update state IMMEDIATELY and SYNCHRONOUSLY
       setClaimedPromos(prev => {
+        console.log("🔄 Updating claimedPromos for promoId:", data.promoId);
         const updated = {
           ...prev,
           [data.promoId]: {
@@ -189,21 +208,31 @@ const fetchFriends = async () => {
             redeemedAt: data.redeemedAt,
           }
         };
+        console.log("✅ New claimedPromos state:", updated[data.promoId]);
         return updated;
       });
 
-      // IMMEDIATELY check and close if modal is open
-      console.log("🔒 Checking if we should close modal...");
-      console.log("   isModalOpen:", isModalOpen);
-      console.log("   currentClaimData exists:", !!currentClaimData);
-      
-      // Simplified check - if ANY modal is open, close it
+      // ✅ Update refs IMMEDIATELY to prevent stale data
+      if (currentClaimData && currentClaimData.promoId === data.promoId) {
+        claimedPromoDataRef.current = {
+          ...currentClaimData,
+          isRedeemed: true,
+          redeemedAt: data.redeemedAt,
+        };
+      }
+
+      // Close modal if open
       if (isModalOpen) {
         console.log("✅ CLOSING QR MODAL NOW!");
         
-        // Close QR modal immediately
         setQrModalVisible(false);
-        setClaimedPromoData(null);
+        qrModalVisibleRef.current = false;
+        
+        // Clear claim data AFTER a small delay to prevent re-opening
+        setTimeout(() => {
+          setClaimedPromoData(null);
+          claimedPromoDataRef.current = null;
+        }, 100);
         
         setRedeemedPromoTitle(promoTitle);
         
@@ -213,11 +242,15 @@ const fetchFriends = async () => {
           animateCheckmark();
         }, 400);
       } else {
-        console.log("❌ QR modal NOT open - isModalOpen is false");
-        console.log("   This means the ref wasn't updated or modal wasn't actually open");
+        console.log("ℹ️ QR modal not open, just updating state");
+        // Still clear the data to prevent any stale reopening
+        setClaimedPromoData(null);
+        claimedPromoDataRef.current = null;
       }
 
+      // Refresh promos list
       fetchPromos();
+      fetchClaimedPromos();
     });
 
     newSocket.on("connect_error", (error) => {
@@ -320,13 +353,16 @@ const fetchFriends = async () => {
   const handleClaimPromo = async (promoId) => {
     if (!customer?.token) return;
 
-    const claimData = claimedPromos[promoId];
-    if (claimData) {
-      if (claimData.isRedeemed) {
-        Alert.alert("Already Claimed", "This promo has already been redeemed!");
+    const existingClaim = claimedPromos[promoId];
+
+    // If already claimed or redeemed, don't process
+    if (existingClaim) {
+      if (existingClaim.isRedeemed) {
+        Alert.alert("Already Redeemed", "This promo has already been redeemed!");
         return;
       }
-      handleViewQR(promoId);
+      // If claimed but not redeemed, user should use "View QR" button
+      Alert.alert("Already Claimed", "Use 'View QR Code' button to see your QR code.");
       return;
     }
 
@@ -343,34 +379,33 @@ const fetchFriends = async () => {
           promoId: promoId,
           promoTitle: promos.find(p => p.promoId === promoId)?.title || 'Promo'
         };
-        
+
+        // Update claimed promos state
         setClaimedPromos(prev => ({
           ...prev,
           [promoId]: claimData
         }));
-        
+
+        // Show QR modal
         setClaimedPromoData(claimData);
         setQrModalVisible(true);
-        
-        // ✅ Manually update refs immediately
+
+        // Update refs immediately for socket events
         qrModalVisibleRef.current = true;
         claimedPromoDataRef.current = claimData;
-        
+
         fetchPromos();
       } else {
         Alert.alert("Failed", response.data.message);
       }
     } catch (error) {
-      if (error.response?.status === 400 && 
-          error.response?.data?.message?.includes("claim limit")) {
+      // Handle claim limit or other backend errors
+      if (
+        error.response?.status === 400 &&
+        error.response?.data?.message?.includes("claim limit")
+      ) {
         await fetchClaimedPromos();
-        setTimeout(() => {
-          if (claimedPromos[promoId]) {
-            handleViewQR(promoId);
-          } else {
-            Alert.alert("Info", "You have already claimed this promo");
-          }
-        }, 500);
+        Alert.alert("Info", "You have already claimed this promo");
       } else {
         Alert.alert(
           "Error",
@@ -380,14 +415,27 @@ const fetchFriends = async () => {
     }
   };
 
-  const handleViewQR = (promoId) => {
-    const claimData = claimedPromos[promoId];
+  const handleViewQR = async (promoId) => {
     console.log("🔍 handleViewQR called for promoId:", promoId);
-    console.log("🔍 claimData:", claimData);
     
-    if (claimData) {
-      if (claimData.isRedeemed) {
-        Alert.alert("Already Claimed", "This promo has already been redeemed!");
+    // ✅ CRITICAL: Fetch fresh data before opening modal
+    await fetchClaimedPromos();
+    
+    // Use a small delay to ensure state has updated
+    setTimeout(() => {
+      const claimData = claimedPromos[promoId];
+      console.log("🔍 Fresh claimData:", claimData);
+      console.log("🔍 isRedeemed status:", claimData?.isRedeemed);
+      
+      if (!claimData) {
+        Alert.alert("Error", "Claim data not found");
+        return;
+      }
+      
+      // Check if redeemed - use strict equality check
+      if (claimData.isRedeemed === true) {
+        console.log("❌ Promo is marked as redeemed, blocking modal");
+        Alert.alert("Already Redeemed", "This promo has already been redeemed!");
         return;
       }
       
@@ -397,17 +445,16 @@ const fetchFriends = async () => {
         promoTitle: promos.find(p => p.promoId === promoId)?.title || 'Promo'
       };
       
-      console.log("🔍 Setting claimedPromoData:", dataToSet);
+      console.log("✅ Opening QR modal with data:", dataToSet);
       setClaimedPromoData(dataToSet);
       setQrModalVisible(true);
       
+      // Update refs immediately for socket events
       qrModalVisibleRef.current = true;
       claimedPromoDataRef.current = dataToSet;
       
-      console.log("🔍 QR Modal should now be visible");
-      console.log("🔍 qrModalVisibleRef.current:", qrModalVisibleRef.current);
-      console.log("🔍 claimedPromoDataRef.current:", claimedPromoDataRef.current);
-    }
+      console.log("🔍 QR Modal opened");
+    }, 100);
   };
 
   const closeQrModal = () => {
@@ -447,9 +494,6 @@ const fetchFriends = async () => {
     const isClaimed = !!claimData;
     const isRedeemed = claimData?.isRedeemed || false;
 
- 
-
-    
     return (
       <View style={styles.promoCard}>
         <View style={styles.businessHeader}>
@@ -510,7 +554,13 @@ const fetchFriends = async () => {
                   ? styles.viewQrButton 
                   : styles.claimButton
             }
-            onPress={() => handleClaimPromo(item.promoId)}
+            onPress={() => {
+              if (!isRedeemed && isClaimed) {
+                handleViewQR(item.promoId);
+              } else if (!isRedeemed && !isClaimed) {
+                handleClaimPromo(item.promoId);
+              }
+            }}
             disabled={isRedeemed}
           >
             <Text style={
@@ -547,15 +597,8 @@ const fetchFriends = async () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          Welcome, {customer.firstName || customer.name}!
-        </Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
+
+      <Header />
 
         {friends.length > 0 && (
         <View style={{ paddingVertical: 10 }}>
@@ -638,7 +681,8 @@ const fetchFriends = async () => {
                   {claimedPromoData.promoTitle}
                 </Text>
 
-                {claimedPromoData.qrCode && !claimedPromoData.isRedeemed && (
+                {/* ✅ SAFETY CHECK: Only show QR if NOT redeemed */}
+                {claimedPromoData.qrCode && claimedPromoData.isRedeemed !== true && (
                   <View style={styles.qrContainer}>
                     <Text style={styles.qrLabel}>
                       Show this QR code to redeem:
@@ -650,7 +694,8 @@ const fetchFriends = async () => {
                   </View>
                 )}
 
-                {claimedPromoData.isRedeemed && (
+                {/* Show redeemed message if redeemed */}
+                {claimedPromoData.isRedeemed === true && (
                   <View style={styles.redeemedContainer}>
                     <Text style={styles.redeemedText}>✓ Redeemed</Text>
                     <Text style={styles.redeemedSubtext}>
@@ -675,14 +720,14 @@ const fetchFriends = async () => {
                       Redeemed: {formatDateTime(claimedPromoData.redeemedAt)}
                     </Text>
                   )}
-                  {claimedPromoData.expiresAt && !claimedPromoData.isRedeemed && (
+                  {claimedPromoData.expiresAt && claimedPromoData.isRedeemed !== true && (
                     <Text style={styles.claimDetailText}>
                       Expires: {formatDateTime(claimedPromoData.expiresAt)}
                     </Text>
                   )}
                 </View>
 
-                {!claimedPromoData.isRedeemed && (
+                {claimedPromoData.isRedeemed !== true && (
                   <Text style={styles.instructionText}>
                     Present this QR code at the business to redeem your promo!
                   </Text>
@@ -749,6 +794,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#333",
     flex: 1,
+  },
+   requests: {
+    padding: 10,
+    backgroundColor: "#eee",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   logoutButton: {
     backgroundColor: "#dc3545",
@@ -923,7 +975,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 14,
   },
-  // QR Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -1018,7 +1069,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "500",
   },
-  // Success Modal Styles
   successModalContainer: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -1075,7 +1125,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
-    sectionTitle: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",

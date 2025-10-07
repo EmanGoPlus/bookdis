@@ -1,12 +1,14 @@
 import db from "../db/config.js";
 import {
   claimedPromos,
+  sharedPromos,
   promos,
   customerMemberships,
   customers,
   businesses,
 } from "../db/schema.js";
 import { eq, and, lte, gte, count } from "drizzle-orm";
+import { v4 as uuidv4 } from "uuid";
 
 const promoModel = {
   async createPromo(data) {
@@ -141,6 +143,128 @@ const promoModel = {
       .where(eq(claimedPromos.customerId, customerId));
   },
 
+  async getOrCreateClaimByPromoAndCustomer(promoId, customerId) {
+  let claim = await db
+    .select()
+    .from(claimedPromos)
+    .where(
+      and(
+        eq(claimedPromos.promoId, promoId),
+        eq(claimedPromos.customerId, customerId),
+        eq(claimedPromos.isRedeemed, false) // ✅ only unredeemed
+      )
+    )
+    .limit(1)
+    .then(res => res[0] || null);
+
+  if (!claim) {
+    // generate QR and insert claim row
+    const qrCode = uuidv4();
+    const qrExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h expiry
+
+    const [newClaim] = await db
+      .insert(claimedPromos)
+      .values({
+        promoId,
+        customerId,
+        qrCode,
+        qrExpiresAt,
+        isRedeemed: false,
+      })
+      .returning();
+
+    claim = newClaim;
+  }
+
+  return claim;
+},
+
+// Fixed redeemPromoByQr method for promoModel.js
+
+async redeemPromoByQr(qrCode) {
+  return await db.transaction(async (tx) => {
+    console.log("🔒 Starting transaction for QR:", qrCode);
+
+    // 1. Lock the claim row for update
+    const claim = await tx
+      .select({
+        claimId: claimedPromos.id,
+        promoId: claimedPromos.promoId,
+        customerId: claimedPromos.customerId,
+        isRedeemed: claimedPromos.isRedeemed,
+        redeemedAt: claimedPromos.redeemedAt,
+        qrExpiresAt: claimedPromos.qrExpiresAt,
+        promoTitle: promos.title,
+        customerFirstName: customers.firstName,
+        customerLastName: customers.lastName,
+      })
+      .from(claimedPromos)
+      .innerJoin(promos, eq(claimedPromos.promoId, promos.id))
+      .innerJoin(customers, eq(claimedPromos.customerId, customers.id))
+      .where(eq(claimedPromos.qrCode, qrCode))
+      .for('update') // ✅ PostgreSQL row lock
+      .limit(1);
+
+    console.log("📋 Claim found:", claim.length > 0 ? "YES" : "NO");
+
+    if (!claim[0]) {
+      console.log("❌ QR code invalid");
+      throw new Error("QR code is invalid");
+    }
+
+    const c = claim[0];
+    console.log("📊 Claim data:", {
+      claimId: c.claimId,
+      promoId: c.promoId,
+      customerId: c.customerId,
+      isRedeemed: c.isRedeemed,
+    });
+
+    const now = new Date();
+
+    // 2. Check if already redeemed (with strict check)
+    if (c.isRedeemed === true) {
+      console.log("❌ Already redeemed at:", c.redeemedAt);
+      throw new Error("Promo has already been redeemed");
+    }
+
+    // 3. Check expiration (if set)
+    if (c.qrExpiresAt && c.qrExpiresAt < now) {
+      console.log("❌ QR expired at:", c.qrExpiresAt);
+      throw new Error("QR code has expired");
+    }
+
+    // 4. Mark as redeemed
+    console.log("✅ Marking as redeemed...");
+    const [redeemed] = await tx
+      .update(claimedPromos)
+      .set({ 
+        isRedeemed: true, 
+        redeemedAt: now 
+      })
+      .where(eq(claimedPromos.id, c.claimId))
+      .returning();
+
+    console.log("✅ Redemption complete:", {
+      claimId: redeemed.id,
+      isRedeemed: redeemed.isRedeemed,
+      redeemedAt: redeemed.redeemedAt,
+    });
+
+    // 5. Return complete data
+    return {
+      claimId: redeemed.id,
+      promoId: c.promoId,
+      customerId: c.customerId,
+      promoTitle: c.promoTitle,
+      customerName: `${c.customerFirstName} ${c.customerLastName}`,
+      redeemedAt: redeemed.redeemedAt,
+      isRedeemed: true,
+    };
+  });
+},
+
+
   async getClaimByPromoAndCustomer(promoId, customerId) {
     const result = await db
       .select()
@@ -150,7 +274,8 @@ const promoModel = {
           eq(claimedPromos.promoId, promoId),
           eq(claimedPromos.customerId, customerId)
         )
-      );
+      )
+      .limit(1);
 
     return result[0] || null;
   },
@@ -187,18 +312,28 @@ const promoModel = {
     return result[0] || null;
   },
 
-  async redeemClaim(claimId) {
-    const result = await db
-      .update(claimedPromos)
-      .set({
-        isRedeemed: true,
-        redeemedAt: new Date(),
-      })
-      .where(eq(claimedPromos.id, claimId))
-      .returning();
+async redeemClaim(claimId) {
+  const result = await db
+    .update(claimedPromos)
+    .set({
+      isRedeemed: true,
+      redeemedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(claimedPromos.id, claimId),
+        eq(claimedPromos.isRedeemed, false) 
+      )
+    )
+    .returning();
 
-    return result[0];
-  },
+  if (!result[0]) {
+    throw new Error("Promo has already been redeemed");
+  }
+
+  return result[0];
+},
+
 
   async getBusinessByPromo(promoId) {
     const result = await db
@@ -225,6 +360,83 @@ const promoModel = {
       .limit(1);
 
     return result[0] || null;
+  },
+
+  async claimedPromosInventory(customerId) {
+    const result = await db
+      .select({
+        claimId: claimedPromos.id,
+        promoId: claimedPromos.promoId,
+        claimedAt: claimedPromos.createdAt,
+        isRedeemed: claimedPromos.isRedeemed,
+        qrCode: claimedPromos.qrCode,
+        qrExpiresAt: claimedPromos.qrExpiresAt,
+        redeemedAt: claimedPromos.redeemedAt,
+        promoTitle: promos.title,
+        promoDescription: promos.description,
+        promoImage: promos.imageUrl,
+        promoType: promos.promoType,
+        promoStart: promos.startDate,
+        promoEnd: promos.endDate,
+        businessId: businesses.id,
+        businessName: businesses.businessName,
+        businessLogo: businesses.logo, // This will map to logo_url column
+        promoIsActive: promos.isActive,
+      })
+      .from(claimedPromos)
+      .innerJoin(promos, eq(claimedPromos.promoId, promos.id))
+      .innerJoin(businesses, eq(promos.businessId, businesses.id))
+      .where(eq(claimedPromos.customerId, customerId));
+
+    return result;
+  },
+
+  async sharePromo(customerId, claimId, toCustomerId) {
+    const [claim] = await db
+      .select({ promoId: claimedPromos.promoId })
+      .from(claimedPromos)
+      .where(eq(claimedPromos.id, claimId))
+      .limit(1);
+
+    if (!claim) {
+      throw new Error("Claimed promo not found");
+    }
+
+    const [promo] = await db
+      .select({ endDate: promos.endDate })
+      .from(promos)
+      .where(eq(promos.id, claim.promoId))
+      .limit(1);
+
+    if (!promo) {
+      throw new Error("Promo not found");
+    }
+
+    const qrCode = uuidv4();
+    const qrExpiresAt = promo.endDate;
+
+    await db
+      .update(claimedPromos)
+      .set({
+        isShared: true,
+        sharedAt: new Date(),
+      })
+      .where(eq(claimedPromos.id, claimId));
+
+    const [shared] = await db
+      .insert(sharedPromos)
+      .values({
+        promoId: claim.promoId,
+        claimedPromoId: claimId,
+        fromCustomerId: customerId,
+        toCustomerId,
+        qrCode,
+        qrExpiresAt,
+        isRedeemed: false,
+      })
+      .returning();
+
+    return { qrCode, qrExpiresAt: shared.qrExpiresAt };
   },
 };
 

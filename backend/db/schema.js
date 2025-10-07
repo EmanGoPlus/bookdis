@@ -235,16 +235,18 @@ export const claimedPromos = pgTable("tbl_claimed_promos", {
   promoId: integer("promo_id").references(() => promos.id).notNull(),
   customerId: integer("customer_id").references(() => customers.id).notNull(),
 
-  qrCode: varchar("qr_code", { length: 255 }).notNull(),
-  qrExpiresAt: timestamp("qr_expires_at").notNull(), // 24h from claim
+  qrCode: varchar("qr_code", { length: 255 }).notNull(),   // persistent
+  qrExpiresAt: timestamp("qr_expires_at"),                // optional
 
-  isRedeemed: boolean("is_redeemed").default(false),
+  isRedeemed: boolean("is_redeemed").default(false),      // still false until scan
   redeemedAt: timestamp("redeemed_at"),
-isShared: boolean("is_shared").default(false).notNull(),
-sharedAt: timestamp("shared_at"),
+
+  isShared: boolean("is_shared").default(false).notNull(),
+  sharedAt: timestamp("shared_at"),
 
   createdAt: timestamp("created_at").defaultNow(),
 });
+
 
 
 export const sharedPromos = pgTable("tbl_shared_promos", {

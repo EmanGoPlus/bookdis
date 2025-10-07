@@ -120,7 +120,7 @@ async function userRoutes(fastify, options) {
     handler: promoController.getClaimedPromos,
   });
 
-  fastify.get("/customer/promos/:id/claim", {
+  fastify.get("/customer/promos/:id/qr", {
     preHandler: authenticateToken,
     handler: promoController.getClaimForPromo,
   });
@@ -137,6 +137,16 @@ async function userRoutes(fastify, options) {
     handler: promoController.redeemPromo,
   });
 
+  fastify.get("/customer/my-promos", {
+    preHandler: authenticateToken,
+    handler: promoController.claimedPromosInventory,
+  });
+
+  fastify.post("/customer/share-promo", {
+    preHandler: authenticateToken,
+    handler: promoController.sharePromo,
+  });
+
   //=============================MEMBERSHIP=============================
   fastify.post("/customer/membership", {
     preHandler: authenticateToken,
@@ -150,30 +160,29 @@ async function userRoutes(fastify, options) {
 
   //=============================FRIENDS=============================
 
-   fastify.post("/customer/friends/send", {
+  fastify.post("/customer/friends/add", {
     preHandler: authenticateToken,
-    handler: friendController.sendFriendRequest,
+    handler: friendController.addFriend,
   });
 
-  // Get Friends of a User
   fastify.get("/customer/friends/:customerId", {
     preHandler: authenticateToken,
     handler: friendController.getFriends,
   });
 
-  fastify.put("/customer/friends/accept/:requestId", {
+  fastify.delete("/customer/friends/remove/:customerId/:friendId", {
     preHandler: authenticateToken,
-    handler: friendController.acceptFriendRequest,
+    handler: friendController.removeFriend,
   });
 
-  fastify.delete("/customer/friends/reject/:requestId", {
-    preHandler: authenticateToken,
-    handler: friendController.rejectFriendRequest,
-  });
+  // fastify.get("/customer/search/:customerCode", {
+  //   preHandler: authenticateToken,
+  //   handler: friendController.searchByCustomerCode,
+  // });
 
-  fastify.get("/customer/friends/pending/:customerId", {
+  fastify.get("/customer/search/:phone", {
     preHandler: authenticateToken,
-    handler: friendController.getPendingRequests,
+    handler: friendController.searchByPhone,
   });
 }
 
