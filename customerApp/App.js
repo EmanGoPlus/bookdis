@@ -14,6 +14,7 @@ import Register from "./pages/Public/Register";
 import Home from "./pages/Dashboard/Home";
 import AddFriend from "./pages/Dashboard/AddFriend"
 import ClaimedPromos from "./pages/Dashboard/ClaimedPromos"
+import RecievedPromos from "./pages/Dashboard/RecievedPromos"
 
 const Stack = createNativeStackNavigator();
 
@@ -57,6 +58,7 @@ function CustomerNavigator() {
             <Stack.Screen name="Home" component={Home} />
              <Stack.Screen name="AddFriend" component={AddFriend} />
                 <Stack.Screen name="ClaimedPromos" component={ClaimedPromos} />
+                <Stack.Screen name="RecievedPromos" component={RecievedPromos} />
             {/* <Stack.Screen name="Map" component={PartnerMap} /> */}
           </>
         )}

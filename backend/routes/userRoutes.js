@@ -142,10 +142,20 @@ async function userRoutes(fastify, options) {
     handler: promoController.claimedPromosInventory,
   });
 
+  fastify.get("/customer/recieved-promos", {
+    preHandler: authenticateToken,
+    handler: promoController.sharedPromosInventory,
+  });
+
   fastify.post("/customer/share-promo", {
     preHandler: authenticateToken,
     handler: promoController.sharePromo,
   });
+
+fastify.post("/customer/verify-recipient", {
+  preHandler: authenticateToken,
+  handler: promoController.verifyRecipient,
+});
 
   //=============================MEMBERSHIP=============================
   fastify.post("/customer/membership", {

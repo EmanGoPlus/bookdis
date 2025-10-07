@@ -247,8 +247,6 @@ export const claimedPromos = pgTable("tbl_claimed_promos", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-
-
 export const sharedPromos = pgTable("tbl_shared_promos", {
   id: serial("id").primaryKey(),
 
@@ -269,7 +267,6 @@ export const sharedPromos = pgTable("tbl_shared_promos", {
 
   createdAt: timestamp("created_at").defaultNow(),
 });
-
 
 export const friends = pgTable("tbl_friends", {
   id: serial("id").primaryKey(),

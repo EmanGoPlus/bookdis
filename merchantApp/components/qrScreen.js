@@ -111,6 +111,7 @@ export default function QrScannerScreen({ navigation }) {
     }
 
     // Lock scanning
+    //also If the scanner gets an "already redeemed" error, it now treats it as SUCCESS (since the first scan worked) instead of showing an error.
     scanningRef.current = true;
     lastScannedCode.current = data;
     lastScanTime.current = now;
@@ -155,10 +156,8 @@ export default function QrScannerScreen({ navigation }) {
       console.error("❌ Redemption error:", error);
       console.error("Error response:", error.response?.data);
       
-      // Don't show error if it's "already redeemed" from duplicate scan
       if (error.response?.data?.message?.includes("already been redeemed")) {
-        console.log("ℹ️ Ignoring duplicate scan error - first scan succeeded");
-        // Show success since first scan worked
+        console.log("ℹIgnoring duplicate scan error - first scan succeeded");
         setPromoData({
           success: true,
           message: "Promo redeemed successfully",
