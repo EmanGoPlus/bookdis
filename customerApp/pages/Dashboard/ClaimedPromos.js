@@ -17,6 +17,7 @@ import { CustomerContext } from "../../context/AuthContext";
 import { API_BASE_URL } from "../../apiConfig";
 import { useNavigation } from "@react-navigation/native";
 import Svg, { Path } from "react-native-svg";
+import { Picker } from "@react-native-picker/picker";
 
 const { width } = Dimensions.get("window");
 
@@ -37,6 +38,18 @@ const ClaimedPromos = () => {
   const [verifying, setVerifying] = useState(false);
   const [sharing, setSharing] = useState(false);
 
+  // Share modal states
+  const [selectedTheme, setSelectedTheme] = useState("neutral");
+  const [shareMessage, setShareMessage] = useState("");
+
+  const THEME_OPTIONS = [
+    { label: "Love", value: "love" },
+    { label: "Sorry", value: "sorry" },
+    { label: "Congratulations", value: "congratulations" },
+    { label: "Friendship", value: "friendship" },
+    { label: "Neutral", value: "neutral" },
+  ];
+
   // Fetch claimed promos from API
   const fetchClaimedPromos = async () => {
     try {
@@ -49,12 +62,12 @@ const ClaimedPromos = () => {
       );
 
       console.log("✅ Claimed promos:", res.data.data?.length || 0);
-      
+
       // ✅ Filter out shared promos
       const unsharedPromos = (res.data.data || []).filter(
         (promo) => !promo.isShared
       );
-      
+
       setClaimedPromos(unsharedPromos);
     } catch (err) {
       console.error("❌ Error fetching claimed promos:", err);
@@ -94,6 +107,8 @@ const ClaimedPromos = () => {
     setSelectedPromo(null);
     setPhoneNumber("");
     setRecipientInfo(null);
+    setSelectedTheme("neutral");
+    setShareMessage("");
   };
 
   // Close confirmation modal
@@ -148,11 +163,12 @@ const ClaimedPromos = () => {
   // Confirm and share promo
   const handleConfirmShare = async () => {
     setSharing(true);
-
     try {
       console.log("📤 Sharing promo:", {
         claimId: selectedPromo.claimId,
         phone: phoneNumber,
+        theme: selectedTheme,
+        message: shareMessage,
       });
 
       const res = await axios.post(
@@ -160,21 +176,20 @@ const ClaimedPromos = () => {
         {
           claimId: selectedPromo.claimId,
           toCustomerPhone: phoneNumber,
+          theme: selectedTheme,
+          message: shareMessage,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       console.log("✅ Share response:", res.data);
-
       closeConfirmModal();
       closeShareModal();
-      
       Alert.alert(
         "Success!",
         `Promo "${selectedPromo.promoTitle}" has been shared with ${recipientInfo.firstName}!`
       );
 
-      // Refresh the list
       fetchClaimedPromos();
     } catch (err) {
       console.error("❌ Share error:", err);
@@ -229,10 +244,7 @@ const ClaimedPromos = () => {
         </View>
 
         <TouchableOpacity
-          style={[
-            styles.shareButton,
-            !canShare && styles.shareButtonDisabled,
-          ]}
+          style={[styles.shareButton, !canShare && styles.shareButtonDisabled]}
           onPress={() => handleSharePress(item)}
           disabled={!canShare}
         >
@@ -388,6 +400,41 @@ const ClaimedPromos = () => {
                 </Text>
               </View>
 
+              <View style={{ marginBottom: 20 }}>
+                <Text style={styles.inputLabel}>Select Theme</Text>
+                <View style={styles.dropdownContainer}>
+                  <Picker
+                    selectedValue={selectedTheme}
+                    onValueChange={(itemValue) => setSelectedTheme(itemValue)}
+                    style={styles.picker} // ✅ Add this
+                  >
+                    {THEME_OPTIONS.map((option) => (
+                      <Picker.Item
+                        key={option.value}
+                        label={option.label}
+                        value={option.value}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+
+              {/* Message Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Custom Message (Optional)</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { height: 80, textAlignVertical: "top" },
+                  ]}
+                  placeholder="Write a short message..."
+                  placeholderTextColor="#999"
+                  value={shareMessage}
+                  onChangeText={setShareMessage}
+                  multiline
+                />
+              </View>
+
               <View style={styles.modalButtons}>
                 <TouchableOpacity
                   style={styles.cancelButton}
@@ -459,7 +506,8 @@ const ClaimedPromos = () => {
               </View>
 
               <Text style={styles.confirmWarning}>
-                Once shared, this promo will be removed from your list and sent to the recipient.
+                Once shared, this promo will be removed from your list and sent
+                to the recipient.
               </Text>
 
               <View style={styles.modalButtons}>
@@ -768,5 +816,17 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 18,
     fontStyle: "italic",
+  },
+  dropdownContainer: {
+    borderWidth: 2, // Changed from 1 to 2 to match input
+    borderColor: "#e0e0e0", // Match input border color
+    borderRadius: 12, // Match input border radius
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    marginTop: 0, // Remove marginTop: 5
+  },
+  picker: {
+    height: 50,
+    width: "100%",
   },
 });

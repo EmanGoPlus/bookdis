@@ -265,8 +265,13 @@ export const sharedPromos = pgTable("tbl_shared_promos", {
   redeemedBy: integer("redeemed_by").references(() => customers.id),
   redeemedAt: timestamp("redeemed_at"),
 
+  shareTheme: varchar("share_theme", { length: 50 }),   // e.g. "love", "sorry", "friendship", "neutral"
+  shareMessage: text("share_message"),                  // custom message from sender
+  sharedAt: timestamp("shared_at").defaultNow(),
+
   createdAt: timestamp("created_at").defaultNow(),
 });
+
 
 export const friends = pgTable("tbl_friends", {
   id: serial("id").primaryKey(),

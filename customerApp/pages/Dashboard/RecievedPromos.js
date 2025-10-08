@@ -86,54 +86,103 @@ const RecievedPromos = () => {
     });
   };
 
-  const renderPromo = ({ item }) => {
-    console.log("🎨 Rendering promo item:", item);
+const renderPromo = ({ item }) => {
+  console.log("🎨 Rendering promo item:", item);
 
-    const profileUri = item.senderProfile
-      ? `${API_BASE_URL.replace(/\/$/, "")}/${item.senderProfile.replace(/^\//, "")}`
-      : null;
+  const profileUri = item.senderProfile
+    ? `${API_BASE_URL.replace(/\/$/, "")}/${item.senderProfile.replace(/^\//, "")}`
+    : null;
 
-    return (
-      <View style={styles.card}>
-        {profileUri ? (
-          <Image
-            source={{ uri: profileUri }}
-            style={styles.profile}
-            onError={(e) =>
-              console.log("Image load error:", e.nativeEvent.error)
-            }
-          />
-        ) : (
-          <View style={[styles.profile, styles.profilePlaceholder]}>
-            <Text style={styles.profilePlaceholderText}>
-              {item.senderName?.charAt(0)?.toUpperCase() || "?"}
+  // Theme-based colors
+  const getThemeColor = (theme) => {
+    switch (theme?.toLowerCase()) {
+      case 'love':
+        return '#FF1744'; // Red/Pink
+      case 'sorry':
+        return '#FFC107'; // Amber/Yellow
+      case 'congratulations':
+        return '#4CAF50'; // Green
+      case 'friendship':
+        return '#2196F3'; // Blue
+      case 'neutral':
+      default:
+        return '#9E9E9E'; // Gray
+    }
+  };
+
+  const themeColor = getThemeColor(item.theme);
+
+  // Theme emoji
+  const getThemeEmoji = (theme) => {
+    switch (theme?.toLowerCase()) {
+      case 'love':
+        return '❤️';
+      case 'sorry':
+        return '😔';
+      case 'congratulations':
+        return '🎉';
+      case 'friendship':
+        return '🤝';
+      case 'neutral':
+      default:
+        return '🎁';
+    }
+  };
+
+  return (
+    <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: themeColor }]}>
+      {profileUri ? (
+        <Image
+          source={{ uri: profileUri }}
+          style={styles.profile}
+          onError={(e) =>
+            console.log("Image load error:", e.nativeEvent.error)
+          }
+        />
+      ) : (
+        <View style={[styles.profile, styles.profilePlaceholder]}>
+          <Text style={styles.profilePlaceholderText}>
+            {item.senderName?.charAt(0)?.toUpperCase() || "?"}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.info}>
+        <Text style={styles.title}>
+          {item.promoTitle || "Untitled Promo"}
+        </Text>
+        <Text style={styles.business}>
+          {item.businessName || "Unknown Business"}
+        </Text>
+        <Text style={styles.sender}>
+          From: {item.senderName || "Unknown"}
+        </Text>
+        {item.theme && (
+          <View style={styles.themeContainer}>
+            <Text style={styles.themeEmoji}>{getThemeEmoji(item.theme)}</Text>
+            <Text style={[styles.themeText, { color: themeColor }]}>
+              {item.theme.charAt(0).toUpperCase() + item.theme.slice(1)}
             </Text>
           </View>
         )}
-
-        <View style={styles.info}>
-          <Text style={styles.title}>
-            {item.promoTitle || "Untitled Promo"}
+        {item.message && (
+          <Text style={styles.messageText} numberOfLines={2}>
+            "{item.message}"
           </Text>
-          <Text style={styles.business}>
-            {item.businessName || "Unknown Business"}
-          </Text>
-          <Text style={styles.sender}>
-            From: {item.senderName || "Unknown"}
-          </Text>
-        </View>
-
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.qrButton}
-            onPress={() => handleShowQR(item)}
-          >
-            <Text style={styles.qrText}>Show QR</Text>
-          </TouchableOpacity>
-        </View>
+        )}
       </View>
-    );
-  };
+
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.qrButton, { backgroundColor: themeColor }]}
+          onPress={() => handleShowQR(item)}
+        >
+          <Text style={styles.qrText}>Show QR</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
   if (loading) {
     return (
@@ -233,53 +282,71 @@ const RecievedPromos = () => {
               </TouchableOpacity>
             </View>
 
-            {selectedPromo && (
-              <View style={styles.modalContent}>
-                <Text style={styles.promoTitleModal}>
-                  {selectedPromo.promoTitle || "Untitled Promo"}
-                </Text>
-                <Text style={styles.businessNameModal}>
-                  {selectedPromo.businessName || "Unknown Business"}
-                </Text>
+{selectedPromo && (
+  <View style={styles.modalContent}>
+    <Text style={styles.promoTitleModal}>
+      {selectedPromo.promoTitle || "Untitled Promo"}
+    </Text>
+    <Text style={styles.businessNameModal}>
+      {selectedPromo.businessName || "Unknown Business"}
+    </Text>
 
-                {selectedPromo.qrCode ? (
-                  <View style={styles.qrContainer}>
-                    <Text style={styles.qrLabel}>
-                      Show this QR code to redeem:
-                    </Text>
-                    <QRCode value={selectedPromo.qrCode} size={200} />
-                  </View>
-                ) : (
-                  <View style={styles.noQrContainer}>
-                    <Text style={styles.noQrText}>
-                      No QR code available for this promo
-                    </Text>
-                  </View>
-                )}
+    {selectedPromo.qrCode ? (
+      <View style={styles.qrContainer}>
+        <Text style={styles.qrLabel}>
+          Show this QR code to redeem:
+        </Text>
+        <QRCode value={selectedPromo.qrCode} size={200} />
+      </View>
+    ) : (
+      <View style={styles.noQrContainer}>
+        <Text style={styles.noQrText}>
+          No QR code available for this promo
+        </Text>
+      </View>
+    )}
 
-                <View style={styles.promoDetails}>
-                  <Text style={styles.detailLabel}>Shared by:</Text>
-                  <Text style={styles.detailValue}>
-                    {selectedPromo.senderName || "Unknown"}
-                  </Text>
-                  
-                  {selectedPromo.sharedAt && (
-                    <>
-                      <Text style={styles.detailLabel}>Shared on:</Text>
-                      <Text style={styles.detailValue}>
-                        {formatDateTime(selectedPromo.sharedAt)}
-                      </Text>
-                    </>
-                  )}
-                </View>
+    <View style={styles.promoDetails}>
+      <Text style={styles.detailLabel}>Shared by:</Text>
+      <Text style={styles.detailValue}>
+        {selectedPromo.senderName || "Unknown"}
+      </Text>
+      
+      {selectedPromo.theme && (
+        <>
+          <Text style={styles.detailLabel}>Theme:</Text>
+          <Text style={styles.detailValue}>
+            {selectedPromo.theme}
+          </Text>
+        </>
+      )}
 
-                {selectedPromo.qrCode && (
-                  <Text style={styles.instructionText}>
-                    Present this QR code at the business to redeem your promo!
-                  </Text>
-                )}
-              </View>
-            )}
+      {selectedPromo.message && (
+        <>
+          <Text style={styles.detailLabel}>Message:</Text>
+          <Text style={styles.detailValue}>
+            {selectedPromo.message}
+          </Text>
+        </>
+      )}
+      
+      {selectedPromo.sharedAt && (
+        <>
+          <Text style={styles.detailLabel}>Shared on:</Text>
+          <Text style={styles.detailValue}>
+            {formatDateTime(selectedPromo.sharedAt)}
+          </Text>
+        </>
+      )}
+    </View>
+
+    {selectedPromo.qrCode && (
+      <Text style={styles.instructionText}>
+        Present this QR code at the business to redeem your promo!
+      </Text>
+    )}
+  </View>
+)}
           </View>
         </View>
       </Modal>
@@ -407,6 +474,26 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+  },
+   themeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  themeEmoji: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  themeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  messageText: {
+    fontSize: 11,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 4,
+    lineHeight: 16,
   },
   // Modal Styles
   modalOverlay: {

@@ -278,88 +278,95 @@ const promoController = {
     }
   },
 
-async getPromoDetailsByQRCode(request, reply) {
-  try {
-    const { qrCode } = request.body;
-    const user = request.user;
+  async getPromoDetailsByQRCode(request, reply) {
+    try {
+      const { qrCode } = request.body;
+      const user = request.user;
 
-    if (!qrCode) {
-      return reply.status(400).send({
-        success: false,
-        message: "QR code is required",
-      });
-    }
-
-    let businessId = null;
-
-    // 🧠 Only fetch businessId for merchant/employee
-    if (user.role === "merchant" || user.role === "employee") {
-      businessId = await promoModel.getBusinessId(user);
-
-      if (!businessId || isNaN(businessId)) {
-        return reply.status(404).send({
+      if (!qrCode) {
+        return reply.status(400).send({
           success: false,
-          message: "Business not found for this merchant/employee",
+          message: "QR code is required",
         });
       }
-    }
 
-    // ✅ Customers will pass businessId = null
-    const promoDetails = await promoModel.getPromoDetailsByQRCode(qrCode, businessId);
+      let businessId = null;
 
-    if (!promoDetails) {
-      return reply.status(404).send({
+      // 🧠 Only fetch businessId for merchant/employee
+      if (user.role === "merchant" || user.role === "employee") {
+        businessId = await promoModel.getBusinessId(user);
+
+        if (!businessId || isNaN(businessId)) {
+          return reply.status(404).send({
+            success: false,
+            message: "Business not found for this merchant/employee",
+          });
+        }
+      }
+
+      // ✅ Customers will pass businessId = null
+      const promoDetails = await promoModel.getPromoDetailsByQRCode(
+        qrCode,
+        businessId
+      );
+
+      if (!promoDetails) {
+        return reply.status(404).send({
+          success: false,
+          message: "Invalid QR code or promo already redeemed",
+        });
+      }
+
+      if (
+        promoDetails.qrExpiresAt &&
+        new Date(promoDetails.qrExpiresAt) < new Date()
+      ) {
+        return reply.status(400).send({
+          success: false,
+          message: "This QR code has expired",
+        });
+      }
+
+      if (new Date(promoDetails.validUntil) < new Date()) {
+        return reply.status(400).send({
+          success: false,
+          message: "This promo has expired",
+        });
+      }
+
+      const responseData = {
+        promoTitle: promoDetails.promoTitle,
+        description: promoDetails.description,
+        promoType: promoDetails.promoType,
+        imageUrl: promoDetails.imageUrl,
+        validUntil: promoDetails.validUntil,
+        merchantName: promoDetails.businessName,
+        customerName: promoDetails.customerName,
+        customerCode: promoDetails.customerCode,
+        claimId: promoDetails.claimId,
+        claimType: promoDetails.claimType,
+      };
+
+      if (promoDetails.claimType === "shared") {
+        responseData.sharedFrom = promoDetails.fromCustomerName;
+        responseData.isSharedPromo = true;
+      }
+
+      return reply.status(200).send({
+        success: true,
+        message: "Promo details retrieved successfully",
+        data: responseData,
+      });
+    } catch (error) {
+      console.error("❌ Error getting promo details:", error);
+      return reply.status(500).send({
         success: false,
-        message: "Invalid QR code or promo already redeemed",
+        message: `Failed to get promo details: ${
+          error.message || "Unknown error"
+        }`,
       });
     }
-
-    if (promoDetails.qrExpiresAt && new Date(promoDetails.qrExpiresAt) < new Date()) {
-      return reply.status(400).send({
-        success: false,
-        message: "This QR code has expired",
-      });
-    }
-
-    if (new Date(promoDetails.validUntil) < new Date()) {
-      return reply.status(400).send({
-        success: false,
-        message: "This promo has expired",
-      });
-    }
-
-    const responseData = {
-      promoTitle: promoDetails.promoTitle,
-      description: promoDetails.description,
-      promoType: promoDetails.promoType,
-      imageUrl: promoDetails.imageUrl,
-      validUntil: promoDetails.validUntil,
-      merchantName: promoDetails.businessName,
-      customerName: promoDetails.customerName,
-      customerCode: promoDetails.customerCode,
-      claimId: promoDetails.claimId,
-      claimType: promoDetails.claimType,
-    };
-
-    if (promoDetails.claimType === "shared") {
-      responseData.sharedFrom = promoDetails.fromCustomerName;
-      responseData.isSharedPromo = true;
-    }
-
-    return reply.status(200).send({
-      success: true,
-      message: "Promo details retrieved successfully",
-      data: responseData,
-    });
-  } catch (error) {
-    console.error("❌ Error getting promo details:", error);
-    return reply.status(500).send({
-      success: false,
-      message: `Failed to get promo details: ${error.message || "Unknown error"}`,
-    });
-  }
-},
-
+  },
 
   async getClaimedPromos(request, reply) {
     try {
@@ -412,80 +419,48 @@ async getPromoDetailsByQRCode(request, reply) {
   },
 
   async redeemPromo(request, reply) {
-    try {
-      const { qrCode } = request.body;
-      const employeeOrMerchant = request.user;
+  try {
+    const { qrCode } = request.body;
+    const employeeOrMerchant = request.user;
 
-      // Validate request
-      if (!qrCode) {
-        return reply.status(400).send({
-          success: false,
-          message: "QR code is required",
-        });
-      }
-
-      try {
-        // Redeem promo using transaction-safe method
-        const result = await promoModel.redeemPromoByQr(qrCode);
-
-        // Prepare data for socket notifications
-        const socketData = {
-          claimId: result.claimId,
-          promoId: result.promoId || result.claimId,
-          customerId: result.customerId,
-          redeemedAt: result.redeemedAt,
-          promoTitle: result.promoTitle,
-        };
-
-        // Notify the specific customer
-        const customerRoom = `customer-${result.customerId}`;
-        request.server.io.to(customerRoom).emit("promoRedeemed", socketData);
-
-        // Notify all clients for promo list refresh
-        if (result.promoId) {
-          request.server.io.emit("promoUpdate", { promoId: result.promoId });
-        }
-
-        // Respond with success
-        return reply.status(200).send({
-          success: true,
-          message: "Promo redeemed successfully",
-          data: result,
-        });
-      } catch (error) {
-        // Handle known errors
-        if (error.message.includes("invalid")) {
-          return reply.status(404).send({
-            success: false,
-            message: "Invalid QR code",
-          });
-        }
-
-        if (error.message.includes("already been redeemed")) {
-          return reply.status(400).send({
-            success: false,
-            message: "This promo has already been redeemed",
-          });
-        }
-
-        if (error.message.includes("expired")) {
-          return reply.status(400).send({
-            success: false,
-            message: "QR code has expired",
-          });
-        }
-
-        throw error; // Unhandled errors
-      }
-    } catch (error) {
-      // Catch-all error response
-      return reply.status(500).send({
-        success: false,
-        message: "Failed to redeem promo",
-        error: error.message,
-      });
+    if (!qrCode) {
+      return reply.status(400).send({ success: false, message: "QR code is required" });
     }
-  },
+
+    const result = await promoModel.redeemPromoByQr(qrCode);
+
+    const socketData = {
+      claimId: result.claimId,
+      promoId: result.promoId,
+      customerId: result.customerId,
+      redeemedAt: result.redeemedAt,
+      promoTitle: result.promoTitle,
+      source: result.source,
+    };
+
+    const customerRoom = `customer-${result.customerId}`;
+    request.server.io.to(customerRoom).emit("promoRedeemed", socketData);
+    request.server.io.emit("promoUpdate", { promoId: result.promoId });
+
+    return reply.status(200).send({
+      success: true,
+      message: `Promo redeemed successfully (${result.source})`,
+      data: result,
+    });
+  } catch (error) {
+    if (error.message.includes("invalid")) {
+      return reply.status(404).send({ success: false, message: "Invalid QR code" });
+    }
+    if (error.message.includes("already been redeemed")) {
+      return reply.status(400).send({ success: false, message: "This promo has already been redeemed" });
+    }
+    if (error.message.includes("expired")) {
+      return reply.status(400).send({ success: false, message: "QR code has expired" });
+    }
+    return reply.status(500).send({ success: false, message: "Failed to redeem promo", error: error.message });
+  }
+},
+
 
   async claimedPromosInventory(request, reply) {
     try {
@@ -524,9 +499,10 @@ async getPromoDetailsByQRCode(request, reply) {
 
       const promos = await promoModel.sharedPromosInventory(customerId);
 
+      // Ensure we always return an array
       return reply.status(200).send({
         success: true,
-        data: promos,
+        data: Array.isArray(promos) ? promos : [],
       });
     } catch (error) {
       console.error(
@@ -536,7 +512,7 @@ async getPromoDetailsByQRCode(request, reply) {
 
       return reply.status(500).send({
         success: false,
-        message: "Failed to load shared promos.",
+        message: error.message || "An unexpected error occurred.",
       });
     }
   },
@@ -544,14 +520,17 @@ async getPromoDetailsByQRCode(request, reply) {
   async sharePromo(request, reply) {
     try {
       const customerId = request.user.id;
-      const { claimId, toCustomerPhone } = request.body;
+      const { claimId, toCustomerPhone, theme, message } = request.body;
 
       console.log("📤 Share promo request:", {
         fromCustomerId: customerId,
         claimId,
         toCustomerPhone,
+        theme,
+        message,
       });
 
+      // Basic required fields
       if (!claimId || !toCustomerPhone) {
         return reply.status(400).send({
           success: false,
@@ -559,6 +538,7 @@ async getPromoDetailsByQRCode(request, reply) {
         });
       }
 
+      // Phone format validation
       const phoneRegex = /^09\d{9}$/;
       if (!phoneRegex.test(toCustomerPhone)) {
         return reply.status(400).send({
@@ -568,19 +548,37 @@ async getPromoDetailsByQRCode(request, reply) {
         });
       }
 
-      // ✅ Call the MODEL method (all logic is in the model)
+      if (theme && theme.length > 100) {
+        return reply.status(400).send({
+          success: false,
+          message: "Theme must not exceed 100 characters",
+        });
+      }
+
+      if (message && message.length > 500) {
+        return reply.status(400).send({
+          success: false,
+          message: "Message must not exceed 500 characters",
+        });
+      }
+
+      // Call model (pure query)
       const result = await promoModel.sharePromo(
         customerId,
         claimId,
-        toCustomerPhone
+        toCustomerPhone,
+        theme,
+        message
       );
 
-      console.log("✅ Promo shared successfully:", result);
+      console.log("Promo shared successfully:", result);
 
+      // Notify recipient via socket
       const recipientRoom = `customer-${result.toCustomerId}`;
       request.server.io.to(recipientRoom).emit("promoShared", {
         message: "You received a new promo!",
         fromCustomerId: customerId,
+        theme: result.theme,
       });
 
       return reply.status(200).send({
@@ -589,10 +587,12 @@ async getPromoDetailsByQRCode(request, reply) {
         data: {
           qrCode: result.qrCode,
           qrExpiresAt: result.qrExpiresAt,
+          theme: result.theme,
+          message: result.message,
         },
       });
     } catch (error) {
-      console.error("❌ Error sharing promo:", error);
+      console.error("Error sharing promo:", error);
       return reply.status(500).send({
         success: false,
         message: error.message || "Failed to share promo",

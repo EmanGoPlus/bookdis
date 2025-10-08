@@ -23,7 +23,7 @@ async function userRoutes(fastify, options) {
 
   fastify.post("/login", userController.combinedLogin);
 
-  fastify.post("/register", userController.merchantRegister); //fix the name next week // hahahha hindi pa rin naayos tagal na nyan ah!
+  fastify.post("/register", userController.merchantRegister); // fix the name next week // hahahha hindi pa rin naayos tagal na nyan ah! // sana ol baliw kausap sarili
 
   fastify.post("/employee-register", userController.employeeRegister);
 
