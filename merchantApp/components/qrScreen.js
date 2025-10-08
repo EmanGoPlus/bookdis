@@ -6,8 +6,8 @@ import {
   TouchableOpacity, 
   ScrollView, 
   ActivityIndicator,
-  Alert,
-  Animated
+  Animated,
+  PanResponder
 } from "react-native";
 import { CameraView, Camera } from "expo-camera";
 import axios from "axios";
@@ -16,24 +16,26 @@ import { API_BASE_URL } from "../apiConfig";
 import { UserContext } from "../context/AuthContext";
 import io from "socket.io-client";
 
+const SWIPE_THRESHOLD = 150;
+
 export default function QrScannerScreen({ navigation }) {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
-  const [promoData, setPromoData] = useState(null);
+  const [promoPreview, setPromoPreview] = useState(null);
+  const [redemptionResult, setRedemptionResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [userToken, setUserToken] = useState(null);
-  const [socket, setSocket] = useState(null);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0));
+  const [swipeX] = useState(new Animated.Value(0));
   
   const { user, userRole, isMerchant, isEmployee } = useContext(UserContext);
-
   const socketRef = useRef(null);
-  
-  // ✅ Scan prevention refs
   const scanningRef = useRef(false);
   const lastScannedCode = useRef(null);
   const lastScanTime = useRef(0);
+  const currentQrCode = useRef(null);
+  const tokenRef = useRef(null); // ✅ ADD THIS LINE
 
   useEffect(() => {
     if (!userToken || socketRef.current) return;
@@ -65,7 +67,9 @@ export default function QrScannerScreen({ navigation }) {
   useEffect(() => {
     const getToken = async () => {
       const token = await AsyncStorage.getItem("token");
+      console.log("🔑 Token retrieved:", token ? "EXISTS" : "NULL");
       setUserToken(token);
+      tokenRef.current = token; // ✅ ADD THIS LINE
     };
     getToken();
   }, []);
@@ -78,7 +82,7 @@ export default function QrScannerScreen({ navigation }) {
   }, []);
 
   useEffect(() => {
-    if (promoData) {
+    if (promoPreview || redemptionResult) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -93,51 +97,164 @@ export default function QrScannerScreen({ navigation }) {
         })
       ]).start();
     }
-  }, [promoData]);
+  }, [promoPreview, redemptionResult]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx > 0) {
+          swipeX.setValue(gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > SWIPE_THRESHOLD) {
+          console.log("✅ Swipe threshold reached!");
+          Animated.timing(swipeX, {
+            toValue: 400,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            console.log("🎬 Animation completed, calling handleRedeemPromo");
+            console.log("📋 currentQrCode.current:", currentQrCode.current);
+            if (currentQrCode.current) {
+              handleRedeemPromo(currentQrCode.current);
+            } else {
+              console.warn("⚠️ Cannot redeem — no QR code stored");
+            }
+          });
+        } else {
+          Animated.spring(swipeX, {
+            toValue: 0,
+            friction: 8,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const handleBarCodeScanned = async ({ type, data }) => {
     const now = Date.now();
     
-    // ✅ CRITICAL: Prevent multiple scans of the same QR code
     if (scanningRef.current) {
-      console.log("⏭️ Already processing a scan, ignoring");
+      console.log("⏭️ Already scanning, ignoring");
       return;
     }
 
-    // Only allow same QR code to be scanned again after 5 seconds
     if (lastScannedCode.current === data && (now - lastScanTime.current) < 5000) {
-      console.log("⏭️ Same QR code scanned too quickly, ignoring");
+      console.log("⏭️ Same QR code scanned too quickly");
       return;
     }
 
-    // Lock scanning
-    //also If the scanner gets an "already redeemed" error, it now treats it as SUCCESS (since the first scan worked) instead of showing an error.
     scanningRef.current = true;
     lastScannedCode.current = data;
     lastScanTime.current = now;
+    currentQrCode.current = data;
+    
+    console.log("📷 QR Code scanned:", data);
+    console.log("💾 Stored in currentQrCode.current:", currentQrCode.current);
     
     setScanned(true);
     setLoading(true);
     
-    console.log("📷 QR Code scanned:", data);
-    
     try {
-      const endpoint = isMerchant() 
-        ? '/api/user/merchant/redeem-promo'
-        : '/api/user/employee/redeem-promo';
-
-      console.log("📡 Sending redemption request to:", endpoint);
-
+      const url = `${API_BASE_URL}/api/user/business/get-promo-details`;
+      console.log("📡 Fetching promo details from:", url);
+      console.log("🔑 Using token:", tokenRef.current ? "EXISTS" : "NULL"); // ✅ CHANGE THIS LINE
+      
       const response = await axios.post(
-        `${API_BASE_URL}${endpoint}`,
+        url,
         { qrCode: data },
-        { headers: { Authorization: `Bearer ${userToken}` } }
+        { headers: { Authorization: `Bearer ${tokenRef.current}` } } // ✅ CHANGE THIS LINE
       );
 
-      console.log("✅ Response received:", response.data);
+      console.log("✅ Get promo details response:", response.data);
 
       if (response.data.success) {
-        setPromoData({
+        setPromoPreview({
+          qrCode: data,
+          promoTitle: response.data.data.promoTitle,
+          description: response.data.data.description,
+          customerName: response.data.data.customerName,
+          customerCode: response.data.data.customerCode,
+          merchantName: response.data.data.merchantName,
+          validUntil: response.data.data.validUntil,
+          promoType: response.data.data.promoType,
+          imageUrl: response.data.data.imageUrl,
+          claimId: response.data.data.claimId,
+          claimType: response.data.data.claimType,
+          isSharedPromo: response.data.data.isSharedPromo,
+          sharedFrom: response.data.data.sharedFrom,
+        });
+      } else {
+        console.log("⚠️ Get promo details failed:", response.data.message);
+        setRedemptionResult({
+          success: false,
+          error: response.data.message || "Failed to fetch promo details",
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error fetching promo details:", error);
+      console.error("📄 Error response:", error.response?.data);
+      console.error("📊 Error status:", error.response?.status);
+      setRedemptionResult({
+        success: false,
+        error: error.response?.data?.message || "Failed to fetch promo details",
+      });
+    } finally {
+      setLoading(false);
+      setTimeout(() => {
+        scanningRef.current = false;
+      }, 3000);
+    }
+  };
+
+  const handleRedeemPromo = async (qrCode) => {
+    console.log("🎯 handleRedeemPromo called with QR code:", qrCode);
+    console.log("🔑 Token from state:", userToken ? "YES" : "NO");
+    console.log("🔑 Token from ref:", tokenRef.current ? "YES" : "NO"); // ✅ ADD THIS LINE
+    
+    const token = tokenRef.current; // ✅ ADD THIS LINE
+    
+    if (!token) {
+      console.error("❌ No token available!");
+      setRedemptionResult({
+        success: false,
+        error: "Authentication token not found. Please try again.",
+      });
+      setLoading(false);
+      swipeX.setValue(0);
+      return;
+    }
+    
+    setLoading(true);
+    setPromoPreview(null);
+    
+    try {
+      const url = `${API_BASE_URL}/api/user/business/redeem-promo`;
+      console.log("📡 Sending redemption request to:", url);
+      console.log("📦 Request body:", { qrCode });
+      console.log("🔐 Authorization header:", token ? `Bearer ${token.substring(0, 20)}...` : "NULL");
+      
+      const response = await axios.post(
+        url,
+        { qrCode },
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`, // ✅ CHANGE THIS LINE
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
+
+      console.log("✅ Redemption response:", response.data);
+      console.log("📊 Response status:", response.status);
+
+      if (response.data.success) {
+        console.log("🎉 Redemption successful!");
+        setRedemptionResult({
           success: true,
           message: response.data.message,
           promoTitle: response.data.data.promoTitle,
@@ -146,19 +263,21 @@ export default function QrScannerScreen({ navigation }) {
           claimId: response.data.data.claimId,
         });
       } else {
-        console.log("⚠️ Success=false from server:", response.data);
-        setPromoData({
+        console.log("⚠️ Redemption failed (success=false):", response.data.message);
+        setRedemptionResult({
           success: false,
           error: response.data.message || "Failed to redeem promo",
         });
       }
     } catch (error) {
       console.error("❌ Redemption error:", error);
-      console.error("Error response:", error.response?.data);
+      console.error("📄 Error response:", error.response?.data);
+      console.error("📊 Error status:", error.response?.status);
+      console.error("🔍 Error message:", error.message);
       
       if (error.response?.data?.message?.includes("already been redeemed")) {
-        console.log("ℹIgnoring duplicate scan error - first scan succeeded");
-        setPromoData({
+        console.log("ℹ️ Ignoring duplicate scan error - first scan succeeded");
+        setRedemptionResult({
           success: true,
           message: "Promo redeemed successfully",
           promoTitle: "Promo",
@@ -167,30 +286,30 @@ export default function QrScannerScreen({ navigation }) {
           claimId: null,
         });
       } else {
-        setPromoData({
+        setRedemptionResult({
           success: false,
-          error: error.response?.data?.message || "Failed to redeem promo",
+          error: error.response?.data?.message || error.message || "Failed to redeem promo",
         });
       }
     } finally {
       setLoading(false);
-      // Keep scan lock for 3 seconds to prevent rapid re-scanning
-      setTimeout(() => {
-        scanningRef.current = false;
-      }, 3000);
+      swipeX.setValue(0);
     }
   };
 
   const resetScanner = () => {
+    console.log("🔄 Resetting scanner");
     setScanned(false);
-    setPromoData(null);
+    setPromoPreview(null);
+    setRedemptionResult(null);
     setLoading(false);
     fadeAnim.setValue(0);
     scaleAnim.setValue(0);
-    // Reset scan prevention
+    swipeX.setValue(0);
     scanningRef.current = false;
     lastScannedCode.current = null;
     lastScanTime.current = 0;
+    currentQrCode.current = null;
   };
 
   const formatDateTime = (dateString) => {
@@ -281,9 +400,11 @@ export default function QrScannerScreen({ navigation }) {
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#4F0CBD" />
-              <Text style={styles.loadingText}>Verifying QR code...</Text>
+              <Text style={styles.loadingText}>
+                {promoPreview ? "Processing redemption..." : "Verifying QR code..."}
+              </Text>
             </View>
-          ) : promoData ? (
+          ) : promoPreview ? (
             <Animated.View 
               style={[
                 styles.resultContent,
@@ -297,7 +418,95 @@ export default function QrScannerScreen({ navigation }) {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
               >
-                {promoData.success ? (
+                <View style={styles.iconContainer}>
+                  <View style={styles.infoCircle}>
+                    <Text style={styles.infoIcon}>🎟️</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.resultTitle}>Promo Details</Text>
+                <Text style={styles.resultSubtext}>
+                  Review the details before confirming redemption
+                </Text>
+
+                <View style={styles.detailsCard}>
+                  <DetailRow 
+                    label="Promo" 
+                    value={promoPreview.promoTitle}
+                    isFirst
+                  />
+                  <DetailRow 
+                    label="Customer" 
+                    value={promoPreview.customerName}
+                  />
+                  {promoPreview.customerCode && (
+                    <DetailRow 
+                      label="Customer Code" 
+                      value={promoPreview.customerCode}
+                    />
+                  )}
+                  {promoPreview.description && (
+                    <DetailRow 
+                      label="Description" 
+                      value={promoPreview.description}
+                    />
+                  )}
+                  {promoPreview.isSharedPromo && promoPreview.sharedFrom && (
+                    <DetailRow 
+                      label="Shared From" 
+                      value={promoPreview.sharedFrom}
+                      highlight
+                    />
+                  )}
+                  {promoPreview.validUntil && (
+                    <DetailRow 
+                      label="Valid Until" 
+                      value={formatDateTime(promoPreview.validUntil)}
+                      isLast
+                    />
+                  )}
+                </View>
+
+                <View style={styles.swipeContainer}>
+                  <Animated.View
+                    style={[
+                      styles.swipeTrack,
+                      {
+                        transform: [{ translateX: swipeX }]
+                      }
+                    ]}
+                    {...panResponder.panHandlers}
+                  >
+                    <View style={styles.swipeButton}>
+                      <Text style={styles.swipeButtonText}>→</Text>
+                    </View>
+                  </Animated.View>
+                  <Text style={styles.swipeText}>Swipe to Redeem</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={resetScanner}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </Animated.View>
+          ) : redemptionResult ? (
+            <Animated.View 
+              style={[
+                styles.resultContent,
+                { 
+                  opacity: fadeAnim,
+                  transform: [{ scale: scaleAnim }]
+                }
+              ]}
+            >
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+              >
+                {redemptionResult.success ? (
                   <>
                     <View style={styles.iconContainer}>
                       <View style={styles.successCircle}>
@@ -313,23 +522,23 @@ export default function QrScannerScreen({ navigation }) {
                     <View style={styles.detailsCard}>
                       <DetailRow 
                         label="Promo" 
-                        value={promoData.promoTitle}
+                        value={redemptionResult.promoTitle}
                         isFirst
                       />
                       <DetailRow 
                         label="Customer" 
-                        value={promoData.customerName}
+                        value={redemptionResult.customerName}
                       />
-                      {promoData.claimId && (
+                      {redemptionResult.claimId && (
                         <DetailRow 
                           label="Claim ID" 
-                          value={`#${promoData.claimId}`}
+                          value={`#${redemptionResult.claimId}`}
                           highlight
                         />
                       )}
                       <DetailRow 
                         label="Redeemed" 
-                        value={formatDateTime(promoData.redeemedAt)}
+                        value={formatDateTime(redemptionResult.redeemedAt)}
                         isLast
                       />
                     </View>
@@ -348,7 +557,7 @@ export default function QrScannerScreen({ navigation }) {
                     
                     <View style={styles.errorCard}>
                       <Text style={styles.errorMessage}>
-                        {promoData.error}
+                        {redemptionResult.error}
                       </Text>
                     </View>
                   </>
@@ -536,6 +745,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
   },
+  infoCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#4F0CBD",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#4F0CBD",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  infoIcon: {
+    fontSize: 48,
+  },
   successCircle: {
     width: 100,
     height: 100,
@@ -622,6 +847,45 @@ const styles = StyleSheet.create({
     color: "#4F0CBD",
     fontSize: 20,
   },
+  swipeContainer: {
+    height: 70,
+    backgroundColor: "#e8e8e8",
+    borderRadius: 35,
+    marginBottom: 16,
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  swipeTrack: {
+    position: "absolute",
+    left: 5,
+    top: 5,
+    bottom: 5,
+  },
+  swipeButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#4F0CBD",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  swipeButtonText: {
+    fontSize: 28,
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  swipeText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666",
+  },
   errorCard: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -665,6 +929,19 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: "#666",
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  cancelButton: {
+    backgroundColor: "#fff",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#dc3545",
+  },
+  cancelButtonText: {
+    color: "#dc3545",
     fontSize: 17,
     fontWeight: "600",
   },

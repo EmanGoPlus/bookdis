@@ -278,6 +278,89 @@ const promoController = {
     }
   },
 
+async getPromoDetailsByQRCode(request, reply) {
+  try {
+    const { qrCode } = request.body;
+    const user = request.user;
+
+    if (!qrCode) {
+      return reply.status(400).send({
+        success: false,
+        message: "QR code is required",
+      });
+    }
+
+    let businessId = null;
+
+    // 🧠 Only fetch businessId for merchant/employee
+    if (user.role === "merchant" || user.role === "employee") {
+      businessId = await promoModel.getBusinessId(user);
+
+      if (!businessId || isNaN(businessId)) {
+        return reply.status(404).send({
+          success: false,
+          message: "Business not found for this merchant/employee",
+        });
+      }
+    }
+
+    // ✅ Customers will pass businessId = null
+    const promoDetails = await promoModel.getPromoDetailsByQRCode(qrCode, businessId);
+
+    if (!promoDetails) {
+      return reply.status(404).send({
+        success: false,
+        message: "Invalid QR code or promo already redeemed",
+      });
+    }
+
+    if (promoDetails.qrExpiresAt && new Date(promoDetails.qrExpiresAt) < new Date()) {
+      return reply.status(400).send({
+        success: false,
+        message: "This QR code has expired",
+      });
+    }
+
+    if (new Date(promoDetails.validUntil) < new Date()) {
+      return reply.status(400).send({
+        success: false,
+        message: "This promo has expired",
+      });
+    }
+
+    const responseData = {
+      promoTitle: promoDetails.promoTitle,
+      description: promoDetails.description,
+      promoType: promoDetails.promoType,
+      imageUrl: promoDetails.imageUrl,
+      validUntil: promoDetails.validUntil,
+      merchantName: promoDetails.businessName,
+      customerName: promoDetails.customerName,
+      customerCode: promoDetails.customerCode,
+      claimId: promoDetails.claimId,
+      claimType: promoDetails.claimType,
+    };
+
+    if (promoDetails.claimType === "shared") {
+      responseData.sharedFrom = promoDetails.fromCustomerName;
+      responseData.isSharedPromo = true;
+    }
+
+    return reply.status(200).send({
+      success: true,
+      message: "Promo details retrieved successfully",
+      data: responseData,
+    });
+  } catch (error) {
+    console.error("❌ Error getting promo details:", error);
+    return reply.status(500).send({
+      success: false,
+      message: `Failed to get promo details: ${error.message || "Unknown error"}`,
+    });
+  }
+},
+
+
   async getClaimedPromos(request, reply) {
     try {
       const customerId = request.user.id;
@@ -333,10 +416,7 @@ const promoController = {
       const { qrCode } = request.body;
       const employeeOrMerchant = request.user;
 
-      console.log("🔍 === REDEEM PROMO REQUEST ===");
-      console.log("QR Code:", qrCode);
-      console.log("User:", employeeOrMerchant.id, employeeOrMerchant.role);
-
+      // Validate request
       if (!qrCode) {
         return reply.status(400).send({
           success: false,
@@ -344,44 +424,36 @@ const promoController = {
         });
       }
 
-      // ✅ Use the transaction-based method from promoModel
       try {
+        // Redeem promo using transaction-safe method
         const result = await promoModel.redeemPromoByQr(qrCode);
 
-        console.log("✅ === REDEMPTION SUCCESSFUL ===");
-        console.log("Result:", JSON.stringify(result, null, 2));
-
-        // ✅ Emit socket event with ALL necessary data
+        // Prepare data for socket notifications
         const socketData = {
           claimId: result.claimId,
-          promoId: result.promoId || result.claimId, // Add promoId if available
+          promoId: result.promoId || result.claimId,
           customerId: result.customerId,
           redeemedAt: result.redeemedAt,
           promoTitle: result.promoTitle,
         };
 
+        // Notify the specific customer
         const customerRoom = `customer-${result.customerId}`;
-
-        console.log("📡 Emitting to room:", customerRoom);
-        console.log("📡 Socket data:", JSON.stringify(socketData, null, 2));
-
-        // Emit to the specific customer's room
         request.server.io.to(customerRoom).emit("promoRedeemed", socketData);
 
-        // Emit general update for promo list refresh
+        // Notify all clients for promo list refresh
         if (result.promoId) {
           request.server.io.emit("promoUpdate", { promoId: result.promoId });
         }
 
+        // Respond with success
         return reply.status(200).send({
           success: true,
           message: "Promo redeemed successfully",
           data: result,
         });
       } catch (error) {
-        console.error("❌ Redemption error:", error.message);
-
-        // Handle specific error messages from the transaction
+        // Handle known errors
         if (error.message.includes("invalid")) {
           return reply.status(404).send({
             success: false,
@@ -403,10 +475,10 @@ const promoController = {
           });
         }
 
-        throw error; // Re-throw if not handled
+        throw error; // Unhandled errors
       }
     } catch (error) {
-      console.error("❌ Redeem promo error:", error);
+      // Catch-all error response
       return reply.status(500).send({
         success: false,
         message: "Failed to redeem promo",
@@ -469,124 +541,124 @@ const promoController = {
     }
   },
 
-async sharePromo(request, reply) {
-  try {
-    const customerId = request.user.id;
-    const { claimId, toCustomerPhone } = request.body;
+  async sharePromo(request, reply) {
+    try {
+      const customerId = request.user.id;
+      const { claimId, toCustomerPhone } = request.body;
 
-    console.log("📤 Share promo request:", {
-      fromCustomerId: customerId,
-      claimId,
-      toCustomerPhone,
-    });
+      console.log("📤 Share promo request:", {
+        fromCustomerId: customerId,
+        claimId,
+        toCustomerPhone,
+      });
 
-    if (!claimId || !toCustomerPhone) {
-      return reply.status(400).send({
+      if (!claimId || !toCustomerPhone) {
+        return reply.status(400).send({
+          success: false,
+          message: "Missing required fields: claimId and toCustomerPhone",
+        });
+      }
+
+      const phoneRegex = /^09\d{9}$/;
+      if (!phoneRegex.test(toCustomerPhone)) {
+        return reply.status(400).send({
+          success: false,
+          message:
+            "Invalid phone number format. Must be 11 digits starting with 09",
+        });
+      }
+
+      // ✅ Call the MODEL method (all logic is in the model)
+      const result = await promoModel.sharePromo(
+        customerId,
+        claimId,
+        toCustomerPhone
+      );
+
+      console.log("✅ Promo shared successfully:", result);
+
+      const recipientRoom = `customer-${result.toCustomerId}`;
+      request.server.io.to(recipientRoom).emit("promoShared", {
+        message: "You received a new promo!",
+        fromCustomerId: customerId,
+      });
+
+      return reply.status(200).send({
+        success: true,
+        message: "Promo shared successfully",
+        data: {
+          qrCode: result.qrCode,
+          qrExpiresAt: result.qrExpiresAt,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error sharing promo:", error);
+      return reply.status(500).send({
         success: false,
-        message: "Missing required fields: claimId and toCustomerPhone",
+        message: error.message || "Failed to share promo",
       });
     }
+  },
 
-    const phoneRegex = /^09\d{9}$/;
-    if (!phoneRegex.test(toCustomerPhone)) {
-      return reply.status(400).send({
+  async verifyRecipient(request, reply) {
+    try {
+      const { phone } = request.body;
+
+      console.log("🔍 Verifying recipient:", phone);
+
+      if (!phone) {
+        return reply.status(400).send({
+          success: false,
+          message: "Phone number is required",
+        });
+      }
+
+      const phoneRegex = /^09\d{9}$/;
+      if (!phoneRegex.test(phone)) {
+        return reply.status(400).send({
+          success: false,
+          message: "Invalid phone number format",
+        });
+      }
+
+      // Use the model method to find customer
+      const customer = await promoModel.findCustomerByPhone(phone);
+
+      if (!customer) {
+        return reply.status(404).send({
+          success: false,
+          message: "No user found with this phone number",
+        });
+      }
+
+      // Check if trying to share with self
+      if (customer.id === request.user.id) {
+        return reply.status(400).send({
+          success: false,
+          message: "You cannot share a promo with yourself",
+        });
+      }
+
+      console.log("✅ Recipient verified:", customer.firstName);
+
+      return reply.status(200).send({
+        success: true,
+        message: "Recipient found",
+        data: {
+          id: customer.id,
+          firstName: customer.firstName,
+          lastName: customer.lastName,
+          phone: customer.phone,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error verifying recipient:", error);
+      return reply.status(500).send({
         success: false,
-        message: "Invalid phone number format. Must be 11 digits starting with 09",
+        message: "Failed to verify recipient",
       });
     }
-
-    // ✅ Call the MODEL method (all logic is in the model)
-    const result = await promoModel.sharePromo(
-      customerId,
-      claimId,
-      toCustomerPhone
-    );
-
-    console.log("✅ Promo shared successfully:", result);
-
-    const recipientRoom = `customer-${result.toCustomerId}`;
-    request.server.io.to(recipientRoom).emit("promoShared", {
-      message: "You received a new promo!",
-      fromCustomerId: customerId,
-    });
-
-    return reply.status(200).send({
-      success: true,
-      message: "Promo shared successfully",
-      data: {
-        qrCode: result.qrCode,
-        qrExpiresAt: result.qrExpiresAt,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Error sharing promo:", error);
-    return reply.status(500).send({
-      success: false,
-      message: error.message || "Failed to share promo",
-    });
-  }
-},
-
-// In promoController.js
-async verifyRecipient(request, reply) {
-  try {
-    const { phone } = request.body;
-
-    console.log("🔍 Verifying recipient:", phone);
-
-    if (!phone) {
-      return reply.status(400).send({
-        success: false,
-        message: "Phone number is required",
-      });
-    }
-
-    const phoneRegex = /^09\d{9}$/;
-    if (!phoneRegex.test(phone)) {
-      return reply.status(400).send({
-        success: false,
-        message: "Invalid phone number format",
-      });
-    }
-
-    // Use the model method to find customer
-    const customer = await promoModel.findCustomerByPhone(phone);
-
-    if (!customer) {
-      return reply.status(404).send({
-        success: false,
-        message: "No user found with this phone number",
-      });
-    }
-
-    // Check if trying to share with self
-    if (customer.id === request.user.id) {
-      return reply.status(400).send({
-        success: false,
-        message: "You cannot share a promo with yourself",
-      });
-    }
-
-    console.log("✅ Recipient verified:", customer.firstName);
-
-    return reply.status(200).send({
-      success: true,
-      message: "Recipient found",
-      data: {
-        id: customer.id,
-        firstName: customer.firstName,
-        lastName: customer.lastName,
-        phone: customer.phone,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Error verifying recipient:", error);
-    return reply.status(500).send({
-      success: false,
-      message: "Failed to verify recipient",
-    });
-  }
-},
+  },
 };
 
 export default promoController;

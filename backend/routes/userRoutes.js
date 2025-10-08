@@ -125,6 +125,16 @@ async function userRoutes(fastify, options) {
     handler: promoController.getClaimForPromo,
   });
 
+   fastify.post("/business/get-promo-details", {
+     preHandler: authenticateToken,
+    handler: promoController.getPromoDetailsByQRCode,
+   });
+
+     fastify.post("/business/redeem-promo", {
+    preHandler: authenticateToken,
+    handler: promoController.redeemPromo,
+  });
+
   // For employees
   fastify.post("/employee/redeem-promo", {
     preHandler: authenticateToken,

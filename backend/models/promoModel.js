@@ -181,8 +181,7 @@ const promoModel = {
 
   async redeemPromoByQr(qrCode) {
     return await db.transaction(async (tx) => {
-      console.log("🔒 Starting transaction for QR:", qrCode);
-
+      // Attempt to find the claim in claimedPromos and lock it for update
       const claim = await tx
         .select({
           claimId: claimedPromos.id,
@@ -202,34 +201,25 @@ const promoModel = {
         .for("update")
         .limit(1);
 
-      console.log("📋 Claim found:", claim.length > 0 ? "YES" : "NO");
-
       if (!claim[0]) {
-        console.log("❌ QR code invalid");
+        // QR code does not exist
         throw new Error("QR code is invalid");
       }
 
       const c = claim[0];
-      console.log("📊 Claim data:", {
-        claimId: c.claimId,
-        promoId: c.promoId,
-        customerId: c.customerId,
-        isRedeemed: c.isRedeemed,
-      });
-
       const now = new Date();
 
-      if (c.isRedeemed === true) {
-        console.log("❌ Already redeemed at:", c.redeemedAt);
+      // Check if already redeemed
+      if (c.isRedeemed) {
         throw new Error("Promo has already been redeemed");
       }
 
+      // Check if QR code has expired
       if (c.qrExpiresAt && c.qrExpiresAt < now) {
-        console.log("❌ QR expired at:", c.qrExpiresAt);
         throw new Error("QR code has expired");
       }
 
-      console.log("✅ Marking as redeemed...");
+      // Mark the claim as redeemed
       const [redeemed] = await tx
         .update(claimedPromos)
         .set({
@@ -239,13 +229,7 @@ const promoModel = {
         .where(eq(claimedPromos.id, c.claimId))
         .returning();
 
-      console.log("✅ Redemption complete:", {
-        claimId: redeemed.id,
-        isRedeemed: redeemed.isRedeemed,
-        redeemedAt: redeemed.redeemedAt,
-      });
-
-      // 5. Return complete data
+      // Return the relevant data
       return {
         claimId: redeemed.id,
         promoId: c.promoId,
@@ -272,8 +256,96 @@ const promoModel = {
 
     return result[0] || null;
   },
+  
+    //helper for getpromodetails
+  async getBusinessId(user) {
+  // If businessId is already in the token (for employees)
+  if (user.businessId) {
+    return user.businessId;
+  }
+  
+  // For merchants, get their business
+  if (user.role === 'merchant') {
+    const business = await db
+      .select({ id: businesses.id })
+      .from(businesses)
+      .where(eq(businesses.userId, user.id))
+      .limit(1);
+    
+    return business[0]?.id || null;
+  }
+  
+  return null;
+},
 
-  async redeemPromo(promoId, customerId) {},
+async getPromoDetailsByQRCode(qrCode, businessId) {
+  const businessFilter = businessId
+    ? eq(promos.businessId, businessId)
+    : sql`1=1`; // no restriction for customers
+
+  // Claimed promos
+  const claimedResult = await db
+    .select({
+      promoId: promos.id,
+      promoTitle: promos.title,
+      description: promos.description,
+      promoType: promos.promoType,
+      imageUrl: promos.imageUrl,
+      validUntil: promos.endDate,
+      businessName: businesses.businessName,
+      claimId: claimedPromos.id,
+      isRedeemed: claimedPromos.isRedeemed,
+      redeemedAt: claimedPromos.redeemedAt,
+      qrExpiresAt: claimedPromos.qrExpiresAt,
+      customerId: customers.id,
+      customerName: sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+      customerEmail: customers.email,
+      customerCode: customers.customerCode,
+      claimType: sql`'claimed'`.as("claimType"),
+    })
+    .from(claimedPromos)
+    .innerJoin(promos, eq(claimedPromos.promoId, promos.id))
+    .innerJoin(customers, eq(claimedPromos.customerId, customers.id))
+    .innerJoin(businesses, eq(promos.businessId, businesses.id))
+    .where(and(eq(claimedPromos.qrCode, qrCode), businessFilter, eq(claimedPromos.isRedeemed, false)))
+    .limit(1);
+
+  if (claimedResult[0]) return claimedResult[0];
+
+  // Shared promos
+  const sharedResult = await db
+    .select({
+      promoId: promos.id,
+      promoTitle: promos.title,
+      description: promos.description,
+      promoType: promos.promoType,
+      imageUrl: promos.imageUrl,
+      validUntil: promos.endDate,
+      businessName: businesses.businessName,
+      claimId: sharedPromos.id,
+      isRedeemed: sharedPromos.isRedeemed,
+      redeemedAt: sharedPromos.redeemedAt,
+      qrExpiresAt: sharedPromos.qrExpiresAt,
+      customerId: customers.id,
+      customerName: sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+      customerEmail: customers.email,
+      customerCode: customers.customerCode,
+      fromCustomerId: sharedPromos.fromCustomerId,
+      fromCustomerName: sql`CONCAT(sender.firstName, ' ', sender.lastName)`,
+      claimType: sql`'shared'`.as("claimType"),
+    })
+    .from(sharedPromos)
+    .innerJoin(promos, eq(sharedPromos.promoId, promos.id))
+    .innerJoin(customers, eq(sharedPromos.toCustomerId, customers.id))
+    .innerJoin(sql`${customers} AS sender`, sql`${sharedPromos.fromCustomerId} = sender.id`)
+    .innerJoin(businesses, eq(promos.businessId, businesses.id))
+    .where(and(eq(sharedPromos.qrCode, qrCode), businessFilter, eq(sharedPromos.isRedeemed, false)))
+    .limit(1);
+
+  return sharedResult[0] || null;
+},
+
+
 
   async getClaimByQrCode(qrCode) {
     const result = await db
@@ -351,48 +423,48 @@ const promoModel = {
     return result[0] || null;
   },
 
-async sharedPromosInventory(customerId) {
-  const result = await db
-    .select({
-      sharedId: sharedPromos.id,
-      promoId: sharedPromos.promoId,
-      claimedPromoId: sharedPromos.claimedPromoId,
-      fromCustomerId: sharedPromos.fromCustomerId,
-      toCustomerId: sharedPromos.toCustomerId,
-      qrCode: sharedPromos.qrCode,
-      qrExpiresAt: sharedPromos.qrExpiresAt,
-      isRedeemed: sharedPromos.isRedeemed,
-      redeemedAt: sharedPromos.redeemedAt,
-      redeemedBy: sharedPromos.redeemedBy,
-      createdAt: sharedPromos.createdAt,
+  async sharedPromosInventory(customerId) {
+    const result = await db
+      .select({
+        sharedId: sharedPromos.id,
+        promoId: sharedPromos.promoId,
+        claimedPromoId: sharedPromos.claimedPromoId,
+        fromCustomerId: sharedPromos.fromCustomerId,
+        toCustomerId: sharedPromos.toCustomerId,
+        qrCode: sharedPromos.qrCode,
+        qrExpiresAt: sharedPromos.qrExpiresAt,
+        isRedeemed: sharedPromos.isRedeemed,
+        redeemedAt: sharedPromos.redeemedAt,
+        redeemedBy: sharedPromos.redeemedBy,
+        createdAt: sharedPromos.createdAt,
 
-      promoTitle: promos.title,
-      promoDescription: promos.description,
-      promoImage: promos.imageUrl,
-      promoType: promos.promoType,
-      promoStart: promos.startDate,
-      promoEnd: promos.endDate,
+        promoTitle: promos.title,
+        promoDescription: promos.description,
+        promoImage: promos.imageUrl,
+        promoType: promos.promoType,
+        promoStart: promos.startDate,
+        promoEnd: promos.endDate,
 
-      businessName: businesses.businessName,
-      senderName:
-        sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`.as(
-          "senderName"
-        ),
-      senderProfile: customers.profilePic,
-    })
-    .from(sharedPromos)
-    .innerJoin(promos, eq(sharedPromos.promoId, promos.id))
-    .innerJoin(businesses, eq(promos.businessId, businesses.id))
-    .innerJoin(customers, eq(sharedPromos.fromCustomerId, customers.id))
-    .where(
-      and(
-        eq(sharedPromos.toCustomerId, customerId),
-        eq(sharedPromos.isRedeemed, false) // ✅ Show unredeemed (available to use)
-      )
-    );
+        businessName: businesses.businessName,
+        senderName:
+          sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`.as(
+            "senderName"
+          ),
+        senderProfile: customers.profilePic,
+      })
+      .from(sharedPromos)
+      .innerJoin(promos, eq(sharedPromos.promoId, promos.id))
+      .innerJoin(businesses, eq(promos.businessId, businesses.id))
+      .innerJoin(customers, eq(sharedPromos.fromCustomerId, customers.id))
+      .where(
+        and(
+          eq(sharedPromos.toCustomerId, customerId),
+          eq(sharedPromos.isRedeemed, false) // ✅ Show unredeemed (available to use)
+        )
+      );
 
-  return result;
-},
+    return result;
+  },
 
   async claimedPromosInventory(customerId) {
     const result = await db
@@ -513,39 +585,39 @@ async sharedPromosInventory(customerId) {
     };
   },
 
-async findCustomerByPhone(phone) {
-  const trimmedPhone = String(phone).trim();
-  
-  console.log("🔍 findCustomerByPhone:", {
-    original: phone,
-    trimmed: trimmedPhone,
-    length: trimmedPhone.length,
-  });
-  
-  const result = await db
-    .select({
-      id: customers.id,
-      firstName: customers.firstName,
-      lastName: customers.lastName,
-      phone: customers.phone,
-    })
-    .from(customers)
-    .where(eq(customers.phone, trimmedPhone))
-    .limit(1);
+  async findCustomerByPhone(phone) {
+    const trimmedPhone = String(phone).trim();
 
-  console.log("🔍 Query result:", result);
-  
-  // Debug: show all customers if not found
-  if (!result[0]) {
-    const allCustomers = await db
-      .select({ id: customers.id, phone: customers.phone })
+    console.log("🔍 findCustomerByPhone:", {
+      original: phone,
+      trimmed: trimmedPhone,
+      length: trimmedPhone.length,
+    });
+
+    const result = await db
+      .select({
+        id: customers.id,
+        firstName: customers.firstName,
+        lastName: customers.lastName,
+        phone: customers.phone,
+      })
       .from(customers)
-      .limit(5);
-    console.log("📋 Sample customers in DB:", allCustomers);
-  }
-  
-  return result[0] || null;
-},
+      .where(eq(customers.phone, trimmedPhone))
+      .limit(1);
+
+    console.log("🔍 Query result:", result);
+
+    // Debug: show all customers if not found
+    if (!result[0]) {
+      const allCustomers = await db
+        .select({ id: customers.id, phone: customers.phone })
+        .from(customers)
+        .limit(5);
+      console.log("📋 Sample customers in DB:", allCustomers);
+    }
+
+    return result[0] || null;
+  },
 };
 
 export default promoModel;
