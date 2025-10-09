@@ -212,7 +212,6 @@ const promoModel = {
     }
 
     if (scannerRole === "merchant") {
-    
       return null;
     }
     throw new Error("Invalid scanner role");
@@ -232,125 +231,142 @@ const promoModel = {
     return result[0] || null;
   },
 
-async redeemPromoByQr(qrCode, scannerBusinessId, redeemedByCustomerId = null) {
-  return await db.transaction(async (tx) => {
-    // Try regular claimed promo first
-    const claim = await tx
-      .select({
-        claimId: claimedPromos.id,
-        promoId: claimedPromos.promoId,
-        customerId: claimedPromos.customerId,
-        isRedeemed: claimedPromos.isRedeemed,
-        redeemedAt: claimedPromos.redeemedAt,
-        qrExpiresAt: claimedPromos.qrExpiresAt,
-        promoTitle: promos.title,
-        promoBusinessId: promos.businessId, // ✅ Get promo's business
-        customerFirstName: customers.firstName,
-        customerLastName: customers.lastName,
-      })
-      .from(claimedPromos)
-      .innerJoin(promos, eq(claimedPromos.promoId, promos.id))
-      .innerJoin(customers, eq(claimedPromos.customerId, customers.id))
-      .where(eq(claimedPromos.qrCode, qrCode))
-      .for("update")
-      .limit(1);
+  async redeemPromoByQr(
+    qrCode,
+    scannerBusinessId,
+    redeemedByCustomerId = null
+  ) {
+    return await db.transaction(async (tx) => {
+      const now = new Date();
+      const claim = await tx
+        .select({
+          claimId: claimedPromos.id,
+          promoId: claimedPromos.promoId,
+          customerId: claimedPromos.customerId,
+          isRedeemed: claimedPromos.isRedeemed,
+          redeemedAt: claimedPromos.redeemedAt,
+          qrExpiresAt: claimedPromos.qrExpiresAt,
+          promoTitle: promos.title,
+          promoBusinessId: promos.businessId,
+          remainingClaims: promos.remainingClaims,
+          customerFirstName: customers.firstName,
+          customerLastName: customers.lastName,
+        })
+        .from(claimedPromos)
+        .innerJoin(promos, eq(claimedPromos.promoId, promos.id))
+        .innerJoin(customers, eq(claimedPromos.customerId, customers.id))
+        .where(eq(claimedPromos.qrCode, qrCode))
+        .for("update")
+        .limit(1);
 
-    const now = new Date();
+      if (claim[0]) {
+        const c = claim[0];
 
-    if (claim[0]) {
-      const c = claim[0];
+        // Verify business match
+        if (c.promoBusinessId !== scannerBusinessId) {
+          throw new Error("This promo belongs to a different business.");
+        }
 
-      // ✅ CRITICAL: Verify business ownership
-      if (c.promoBusinessId !== scannerBusinessId) {
-        throw new Error(
-          "This promo belongs to a different business. You can only redeem promos from your own business."
-        );
+        // Validate QR status
+        if (c.isRedeemed) {
+          throw new Error("Promo has already been redeemed");
+        }
+        if (c.qrExpiresAt && c.qrExpiresAt < now) {
+          throw new Error("QR code has expired");
+        }
+
+        // FOR CLAIMED PROMOS ONLY: Check remaining claims before redemption
+        if (c.remainingClaims <= 0) {
+          throw new Error("Promo is no longer available");
+        }
+        const updatedPromo = await tx
+          .update(promos)
+          .set({ remainingClaims: sql`${promos.remainingClaims} - 1` })
+          .where(
+            and(eq(promos.id, c.promoId), sql`${promos.remainingClaims} > 0`)
+          )
+          .returning();
+
+        if (updatedPromo.length === 0) {
+          throw new Error("Promo is no longer available");
+        }
+
+        const [redeemed] = await tx
+          .update(claimedPromos)
+          .set({ isRedeemed: true, redeemedAt: now })
+          .where(eq(claimedPromos.id, c.claimId))
+          .returning();
+
+        return {
+          claimId: redeemed.id,
+          promoId: c.promoId,
+          customerId: c.customerId,
+          promoTitle: c.promoTitle,
+          customerName: `${c.customerFirstName} ${c.customerLastName}`,
+          redeemedAt: redeemed.redeemedAt,
+          source: "claim",
+        };
       }
 
-      if (c.isRedeemed) throw new Error("Promo has already been redeemed");
-      if (c.qrExpiresAt && c.qrExpiresAt < now)
-        throw new Error("QR code has expired");
+      const shared = await tx
+        .select({
+          shareId: sharedPromos.id,
+          promoId: sharedPromos.promoId,
+          fromCustomerId: sharedPromos.fromCustomerId,
+          isRedeemed: sharedPromos.isRedeemed,
+          redeemedAt: sharedPromos.redeemedAt,
+          qrExpiresAt: sharedPromos.qrExpiresAt,
+          promoTitle: promos.title,
+          promoBusinessId: promos.businessId,
+          remainingClaims: promos.remainingClaims,
+          fromFirstName: customers.firstName,
+          fromLastName: customers.lastName,
+        })
+        .from(sharedPromos)
+        .innerJoin(promos, eq(sharedPromos.promoId, promos.id))
+        .innerJoin(customers, eq(sharedPromos.fromCustomerId, customers.id))
+        .where(eq(sharedPromos.qrCode, qrCode))
+        .for("update")
+        .limit(1);
 
-      const [redeemed] = await tx
-        .update(claimedPromos)
-        .set({ isRedeemed: true, redeemedAt: now })
-        .where(eq(claimedPromos.id, c.claimId))
+      if (!shared[0]) {
+        throw new Error("QR code is invalid");
+      }
+
+      const s = shared[0];
+
+      if (s.promoBusinessId !== scannerBusinessId) {
+        throw new Error("This promo belongs to a different business.");
+      }
+
+      if (s.isRedeemed) {
+        throw new Error("Promo has already been redeemed");
+      }
+      if (s.qrExpiresAt && s.qrExpiresAt < now) {
+        throw new Error("QR code has expired");
+      }
+
+      const [redeemedShared] = await tx
+        .update(sharedPromos)
+        .set({
+          isRedeemed: true,
+          redeemedBy: redeemedByCustomerId || null,
+          redeemedAt: now,
+        })
+        .where(eq(sharedPromos.id, s.shareId))
         .returning();
 
-      // Deduct remaining promo
-      await tx
-        .update(promos)
-        .set({ remainingClaims: sql`${promos.remainingClaims} - 1` })
-        .where(eq(promos.id, c.promoId));
-
       return {
-        claimId: redeemed.id,
-        promoId: c.promoId,
-        customerId: c.customerId,
-        promoTitle: c.promoTitle,
-        customerName: `${c.customerFirstName} ${c.customerLastName}`,
-        redeemedAt: redeemed.redeemedAt,
-        source: "claim",
+        claimId: redeemedShared.id,
+        promoId: s.promoId,
+        customerId: s.fromCustomerId,
+        promoTitle: s.promoTitle,
+        customerName: `${s.fromFirstName} ${s.fromLastName}`,
+        redeemedAt: redeemedShared.redeemedAt,
+        source: "shared",
       };
-    }
-
-    // Try shared promo
-    const shared = await tx
-      .select({
-        shareId: sharedPromos.id,
-        promoId: sharedPromos.promoId,
-        fromCustomerId: sharedPromos.fromCustomerId,
-        isRedeemed: sharedPromos.isRedeemed,
-        redeemedAt: sharedPromos.redeemedAt,
-        qrExpiresAt: sharedPromos.qrExpiresAt,
-        promoTitle: promos.title,
-        promoBusinessId: promos.businessId, // ✅ Get promo's business
-        fromFirstName: customers.firstName,
-        fromLastName: customers.lastName,
-      })
-      .from(sharedPromos)
-      .innerJoin(promos, eq(sharedPromos.promoId, promos.id))
-      .innerJoin(customers, eq(sharedPromos.fromCustomerId, customers.id))
-      .where(eq(sharedPromos.qrCode, qrCode))
-      .for("update")
-      .limit(1);
-
-    if (!shared[0]) throw new Error("QR code is invalid");
-
-    const s = shared[0];
-
-    // ✅ CRITICAL: Verify business ownership
-    if (s.promoBusinessId !== scannerBusinessId) {
-      throw new Error(
-        "This promo belongs to a different business. You can only redeem promos from your own business."
-      );
-    }
-
-    if (s.isRedeemed) throw new Error("Promo has already been redeemed");
-    if (s.qrExpiresAt && s.qrExpiresAt < now)
-      throw new Error("QR code has expired");
-
-    const [redeemedShared] = await tx
-      .update(sharedPromos)
-      .set({
-        isRedeemed: true,
-        redeemedBy: redeemedByCustomerId || null,
-        redeemedAt: now,
-      })
-      .where(eq(sharedPromos.id, s.shareId))
-      .returning();
-
-    return {
-      claimId: redeemedShared.id,
-      promoId: s.promoId,
-      customerId: s.fromCustomerId,
-      promoTitle: s.promoTitle,
-      customerName: `${s.fromFirstName} ${s.fromLastName}`,
-      redeemedAt: redeemedShared.redeemedAt,
-      source: "shared",
-    };
-  });
-},
+    });
+  },
 
   async getClaimByPromoAndCustomer(promoId, customerId) {
     const result = await db
@@ -368,59 +384,58 @@ async redeemPromoByQr(qrCode, scannerBusinessId, redeemedByCustomerId = null) {
   },
 
   //helper for getpromodetails
-async getBusinessId(user, providedBusinessId = null) {
-  // If businessId is already in the token (for employees)
-  if (user.businessId) {
-    return user.businessId;
-  }
-
-  // For employees without businessId in token, get from DB
-  if (user.role === "employee") {
-    const [employee] = await db
-      .select({ businessId: employees.businessId })
-      .from(employees)
-      .where(eq(employees.id, user.id))
-      .limit(1);
-    
-    return employee?.businessId || null;
-  }
-
-  // For merchants with multiple businesses
-  if (user.role === "merchant") {
-    // If businessId is provided (from request), verify ownership
-    if (providedBusinessId) {
-      const [business] = await db
-        .select({ id: businesses.id })
-        .from(businesses)
-        .where(
-          and(
-            eq(businesses.id, providedBusinessId),
-            eq(businesses.userId, user.id)
-          )
-        )
-        .limit(1);
-      
-      if (!business) {
-        throw new Error("You don't have access to this business");
-      }
-      
-      return business.id;
+  async getBusinessId(user, providedBusinessId = null) {
+    // If businessId is already in the token (for employees)
+    if (user.businessId) {
+      return user.businessId;
     }
 
-    // If no businessId provided, throw error (merchant must specify)
-    throw new Error("Merchants with multiple businesses must provide businessId");
-  }
+    // For employees without businessId in token, get from DB
+    if (user.role === "employee") {
+      const [employee] = await db
+        .select({ businessId: employees.businessId })
+        .from(employees)
+        .where(eq(employees.id, user.id))
+        .limit(1);
 
-  return null;
-},
+      return employee?.businessId || null;
+    }
+
+    // For merchants with multiple businesses
+    if (user.role === "merchant") {
+      // If businessId is provided (from request), verify ownership
+      if (providedBusinessId) {
+        const [business] = await db
+          .select({ id: businesses.id })
+          .from(businesses)
+          .where(
+            and(
+              eq(businesses.id, providedBusinessId),
+              eq(businesses.userId, user.id)
+            )
+          )
+          .limit(1);
+
+        if (!business) {
+          throw new Error("You don't have access to this business");
+        }
+
+        return business.id;
+      }
+
+      throw new Error(
+        "Merchants with multiple businesses must provide businessId"
+      );
+    }
+
+    return null;
+  },
 
   async getPromoDetailsByQRCode(qrCode, businessId) {
-    const businessFilter = businessId
-      ? eq(promos.businessId, businessId)
-      : sql`1=1`; // no restriction for customers
+    const now = new Date();
 
-    // Claimed promos
-    const claimedResult = await db
+    // Check claimed promos
+    let result = await db
       .select({
         promoId: promos.id,
         promoTitle: promos.title,
@@ -429,6 +444,8 @@ async getBusinessId(user, providedBusinessId = null) {
         imageUrl: promos.imageUrl,
         validUntil: promos.endDate,
         businessName: businesses.businessName,
+        businessId: businesses.id,
+        remainingClaims: promos.remainingClaims,
         claimId: claimedPromos.id,
         isRedeemed: claimedPromos.isRedeemed,
         redeemedAt: claimedPromos.redeemedAt,
@@ -443,56 +460,121 @@ async getBusinessId(user, providedBusinessId = null) {
       .innerJoin(promos, eq(claimedPromos.promoId, promos.id))
       .innerJoin(customers, eq(claimedPromos.customerId, customers.id))
       .innerJoin(businesses, eq(promos.businessId, businesses.id))
-      .where(
-        and(
-          eq(claimedPromos.qrCode, qrCode),
-          businessFilter,
-          eq(claimedPromos.isRedeemed, false)
-        )
-      )
+      .where(eq(claimedPromos.qrCode, qrCode))
       .limit(1);
 
-    if (claimedResult[0]) return claimedResult[0];
+    // Check shared promos if not found in claimed
+    if (!result[0]) {
+      const sender = alias(customers, "sender");
 
-    // Shared promos
-    const sender = alias(customers, "sender");
+      result = await db
+        .select({
+          promoId: promos.id,
+          promoTitle: promos.title,
+          description: promos.description,
+          promoType: promos.promoType,
+          imageUrl: promos.imageUrl,
+          validUntil: promos.endDate,
+          businessName: businesses.businessName,
+          businessId: businesses.id,
+          remainingClaims: promos.remainingClaims,
+          claimId: sharedPromos.id,
+          isRedeemed: sharedPromos.isRedeemed,
+          redeemedAt: sharedPromos.redeemedAt,
+          qrExpiresAt: sharedPromos.qrExpiresAt,
+          customerId: customers.id,
+          customerName: sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
+          customerEmail: customers.email,
+          customerCode: customers.customerCode,
+          fromCustomerId: sharedPromos.fromCustomerId,
+          fromCustomerName: sql`CONCAT(${sender.firstName}, ' ', ${sender.lastName})`,
+          claimType: sql`'shared'`.as("claimType"),
+        })
+        .from(sharedPromos)
+        .innerJoin(promos, eq(sharedPromos.promoId, promos.id))
+        .innerJoin(customers, eq(sharedPromos.toCustomerId, customers.id))
+        .innerJoin(sender, eq(sharedPromos.fromCustomerId, sender.id))
+        .innerJoin(businesses, eq(promos.businessId, businesses.id))
+        .where(eq(sharedPromos.qrCode, qrCode))
+        .limit(1);
+    }
 
-    const sharedResult = await db
-      .select({
-        promoId: promos.id,
-        promoTitle: promos.title,
-        description: promos.description,
-        promoType: promos.promoType,
-        imageUrl: promos.imageUrl,
-        validUntil: promos.endDate,
-        businessName: businesses.businessName,
-        claimId: sharedPromos.id,
-        isRedeemed: sharedPromos.isRedeemed,
-        redeemedAt: sharedPromos.redeemedAt,
-        qrExpiresAt: sharedPromos.qrExpiresAt,
-        customerId: customers.id,
-        customerName: sql`CONCAT(${customers.firstName}, ' ', ${customers.lastName})`,
-        customerEmail: customers.email,
-        customerCode: customers.customerCode,
-        fromCustomerId: sharedPromos.fromCustomerId,
-        fromCustomerName: sql`CONCAT(${sender.firstName}, ' ', ${sender.lastName})`,
-        claimType: sql`'shared'`.as("claimType"),
-      })
-      .from(sharedPromos)
-      .innerJoin(promos, eq(sharedPromos.promoId, promos.id))
-      .innerJoin(customers, eq(sharedPromos.toCustomerId, customers.id))
-      .innerJoin(sender, eq(sharedPromos.fromCustomerId, sender.id)) // ✅ proper alias join
-      .innerJoin(businesses, eq(promos.businessId, businesses.id))
-      .where(
-        and(
-          eq(sharedPromos.qrCode, qrCode),
-          businessFilter,
-          eq(sharedPromos.isRedeemed, false)
-        )
-      )
-      .limit(1);
+    // QR code doesn't exist at all
+    if (!result[0]) {
+      return { found: false };
+    }
 
-    return sharedResult[0] || null;
+    const promo = result[0];
+
+    // Check if already redeemed - return ONLY error info
+    if (promo.isRedeemed) {
+      return {
+        found: true,
+        isRedeemed: true,
+        redeemedAt: promo.redeemedAt,
+      };
+    }
+
+    // Check if QR expired - return ONLY error info
+    if (promo.qrExpiresAt && new Date(promo.qrExpiresAt) < now) {
+      return {
+        found: true,
+        qrExpired: true,
+        qrExpiresAt: promo.qrExpiresAt,
+      };
+    }
+
+    // Check if promo period expired - return ONLY error info
+    if (new Date(promo.validUntil) < now) {
+      return {
+        found: true,
+        promoExpired: true,
+        validUntil: promo.validUntil,
+      };
+    }
+
+    // CHECK REMAINING CLAIMS - ONLY for claimed promos, NOT for shared
+    // Shared promos were already counted when first redeemed/shared
+    if (promo.claimType === "claimed" && promo.remainingClaims <= 0) {
+      return {
+        found: true,
+        noRemainingClaims: true,
+        remainingClaims: promo.remainingClaims,
+      };
+    }
+
+    // If businessId is provided, verify it matches - return ONLY error info
+    if (businessId && promo.businessId !== businessId) {
+      return {
+        found: true,
+        businessMismatch: true,
+      };
+    }
+
+    // All validations passed - return full promo data
+    return {
+      found: true,
+      promoId: promo.promoId,
+      promoTitle: promo.promoTitle,
+      description: promo.description,
+      promoType: promo.promoType,
+      imageUrl: promo.imageUrl,
+      validUntil: promo.validUntil,
+      businessName: promo.businessName,
+      businessId: promo.businessId,
+      remainingClaims: promo.remainingClaims,
+      claimId: promo.claimId,
+      isRedeemed: promo.isRedeemed,
+      redeemedAt: promo.redeemedAt,
+      qrExpiresAt: promo.qrExpiresAt,
+      customerId: promo.customerId,
+      customerName: promo.customerName,
+      customerEmail: promo.customerEmail,
+      customerCode: promo.customerCode,
+      claimType: promo.claimType,
+      fromCustomerId: promo.fromCustomerId,
+      fromCustomerName: promo.fromCustomerName,
+    };
   },
 
   async getClaimByQrCode(qrCode) {
@@ -571,7 +653,7 @@ async getBusinessId(user, providedBusinessId = null) {
     return result[0] || null;
   },
 
-  //inventiry ng recieved promos
+  //inventory ng recieved promos
   async sharedPromosInventory(customerId) {
     const result = await db
       .select({
@@ -775,27 +857,52 @@ async getBusinessId(user, providedBusinessId = null) {
   },
 
   async getScannerBusinessId(scannerId, scannerRole) {
-  if (scannerRole === "employee") {
-    const [employee] = await db
-      .select({ businessId: employees.businessId })
-      .from(employees)
-      .where(eq(employees.id, scannerId))
-      .limit(1);
-    
-    if (!employee) {
-      throw new Error("Employee not found");
+    if (scannerRole === "employee") {
+      const [employee] = await db
+        .select({ businessId: employees.businessId })
+        .from(employees)
+        .where(eq(employees.id, scannerId))
+        .limit(1);
+
+      if (!employee) {
+        throw new Error("Employee not found");
+      }
+      return employee.businessId;
     }
-    return employee.businessId;
-  }
 
-  if (scannerRole === "merchant") {
-    // For merchants with multiple businesses, you need to pass businessId
-    // This will be handled in the controller
-    return null; // Will be provided by controller
-  }
+    if (scannerRole === "merchant") {
+      // For merchants with multiple businesses, you need to pass businessId
+      // This will be handled in the controller
+      return null; // Will be provided by controller
+    }
 
-  throw new Error("Invalid scanner role");
-},
+    throw new Error("Invalid scanner role");
+  },
+
+  async getRedeemedCount(promoId) {
+    return await db
+      .select({ count: count() })
+      .from(claimedPromos)
+      .where(
+        and(
+          eq(claimedPromos.promoId, promoId),
+          eq(claimedPromos.isRedeemed, true)
+        )
+      );
+  },
+
+  async getUserRedeemedCount(promoId, customerId) {
+    return await db
+      .select({ count: count() })
+      .from(claimedPromos)
+      .where(
+        and(
+          eq(claimedPromos.promoId, promoId),
+          eq(claimedPromos.customerId, customerId),
+          eq(claimedPromos.isRedeemed, true)
+        )
+      );
+  },
 };
 
 export default promoModel;

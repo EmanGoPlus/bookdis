@@ -125,12 +125,12 @@ async function userRoutes(fastify, options) {
     handler: promoController.getClaimForPromo,
   });
 
-   fastify.post("/business/get-promo-details", {
-     preHandler: authenticateToken,
+  fastify.post("/business/get-promo-details", {
+    preHandler: authenticateToken,
     handler: promoController.getPromoDetailsByQRCode,
-   });
+  });
 
-     fastify.post("/business/redeem-promo", {
+  fastify.post("/business/redeem-promo", {
     preHandler: authenticateToken,
     handler: promoController.redeemPromo,
   });
@@ -162,10 +162,10 @@ async function userRoutes(fastify, options) {
     handler: promoController.sharePromo,
   });
 
-fastify.post("/customer/verify-recipient", {
-  preHandler: authenticateToken,
-  handler: promoController.verifyRecipient,
-});
+  fastify.post("/customer/verify-recipient", {
+    preHandler: authenticateToken,
+    handler: promoController.verifyRecipient,
+  });
 
   //=============================MEMBERSHIP=============================
   fastify.post("/customer/membership", {
@@ -177,6 +177,11 @@ fastify.post("/customer/verify-recipient", {
     "/api/membership/deactivate",
     membershipController.deactivateMembership
   );
+
+  fastify.get("/customer/memberships/:customerId", {
+    preHandler: authenticateToken,
+    handler: membershipController.getCustomerMemberships
+  });
 
   //=============================FRIENDS=============================
 

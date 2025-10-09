@@ -1,5 +1,5 @@
 import db from "../db/config.js";
-import { customerMemberships } from "../db/schema.js";
+import { customerMemberships, businesses } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 
 const membershipModel = {
@@ -40,7 +40,31 @@ const membershipModel = {
       )
       .returning();
     return updated;
-  }
+  },
+
+async getMembershipsByCustomer(customerId) {
+    return await db
+      .select({
+        membershipId: customerMemberships.id,
+        customerId: customerMemberships.customerId,
+        businessId: customerMemberships.businessId,
+        membershipLevel: customerMemberships.membershipLevel,
+        isActive: customerMemberships.isActive,
+        createdAt: customerMemberships.createdAt,
+        // Business details
+        businessName: businesses.businessName,
+        businessCode: businesses.businessCode,
+        logo: businesses.logo,
+        mainCategory: businesses.mainCategory,
+        subCategory: businesses.subCategory,
+        city: businesses.city,
+        region: businesses.region,
+        province: businesses.province,
+      })
+      .from(customerMemberships)
+      .leftJoin(businesses, eq(customerMemberships.businessId, businesses.id))
+      .where(eq(customerMemberships.customerId, customerId));
+  },
 
 };
 

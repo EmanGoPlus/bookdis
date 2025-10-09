@@ -97,6 +97,33 @@ const membershipController = {
       });
     }
   },
+  async getCustomerMemberships(request, reply) {
+  try {
+    const { customerId } = request.params;
+
+    if (!customerId) {
+      return reply.status(400).send({
+        success: false,
+        message: "customerId is required",
+      });
+    }
+
+    const memberships = await membershipModel.getMembershipsByCustomer(
+      parseInt(customerId)
+    );
+
+    return reply.status(200).send({
+      success: true,
+      data: memberships,
+    });
+  } catch (err) {
+    console.error("Get customer memberships error:", err);
+    return reply.status(500).send({
+      success: false,
+      message: err.message,
+    });
+  }
+},
 
 };
 

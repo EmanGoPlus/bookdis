@@ -41,6 +41,7 @@ export default function Home() {
   const claimedPromoDataRef = useRef(null);
 
   const [friends, setFriends] = useState([]);
+  const [memberships, setMemberships] = useState([]); // ADD THIS LINE
   const isFocused = useIsFocused();
 
   const navigation = useNavigation();
@@ -57,6 +58,13 @@ export default function Home() {
       fetchFriends();
     }
   }, [customer, isFocused]);
+
+  useEffect(() => {
+  if (customer?.id && customer?.token && isFocused) {
+    fetchFriends();
+    fetchMemberships(); // ADD THIS LINE
+  }
+}, [customer, isFocused]);
 
   const fetchFriends = async () => {
     try {
@@ -78,6 +86,27 @@ export default function Home() {
     }
   };
 
+  const fetchMemberships = async () => {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/api/user/customer/memberships/${customer.id}`,
+      {
+        headers: { Authorization: `Bearer ${customer.token}` },
+      }
+    );
+
+    if (response.data.success) {
+      // Only show active memberships
+      setMemberships(response.data.data.filter(m => m.isActive));
+    } else {
+      setMemberships([]);
+    }
+  } catch (error) {
+    console.error("Error fetching memberships:", error);
+    setMemberships([]);
+  }
+};
+
   const renderFriend = ({ item }) => (
     <View style={styles.friendCard}>
       <Image
@@ -89,6 +118,29 @@ export default function Home() {
       </Text>
     </View>
   );
+
+  const renderMembership = ({ item }) => (
+  <TouchableOpacity 
+    style={styles.membershipCard}
+    onPress={() => {
+      // Navigate to business details or handle tap
+      console.log('Tapped business:', item.businessName);
+    }}
+  >
+    <Image
+      source={{ uri: `${API_BASE_URL}/${item.logo}` }}
+      style={styles.membershipLogo}
+    />
+    <View style={styles.membershipInfo}>
+      <Text style={styles.membershipBusinessName} numberOfLines={1}>
+        {item.businessName}
+      </Text>
+      <Text style={styles.membershipLevel} numberOfLines={1}>
+        {item.membershipLevel || 'Member'}
+      </Text>
+    </View>
+  </TouchableOpacity>
+);
 
   useEffect(() => {
     if (qrModalVisible && claimedPromoData) {
@@ -636,6 +688,20 @@ export default function Home() {
         </View>
       )}
 
+       {memberships.length > 0 && (
+      <View style={{ paddingVertical: 10 }}>
+        <Text style={styles.sectionTitle}>Your Memberships</Text>
+        <FlatList
+          data={memberships}
+          renderItem={renderMembership}
+          keyExtractor={(item) => item.membershipId.toString()}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 10 }}
+        />
+      </View>
+    )}
+
       <View style={styles.content}>
         {loading && !refreshing ? (
           <View style={styles.centerContainer}>
@@ -1167,4 +1233,45 @@ const styles = StyleSheet.create({
     color: "#333",
     textAlign: "center",
   },
+  membershipCard: {
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  padding: 12,
+  marginRight: 12,
+  width: 140,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.1,
+  shadowRadius: 3.84,
+  elevation: 3,
+  alignItems: 'center',
+},
+membershipLogo: {
+  width: 60,
+  height: 60,
+  borderRadius: 30,
+  backgroundColor: '#f0f0f0',
+  marginBottom: 8,
+},
+membershipInfo: {
+  alignItems: 'center',
+  width: '100%',
+},
+membershipBusinessName: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#333',
+  textAlign: 'center',
+  marginBottom: 4,
+},
+membershipLevel: {
+  fontSize: 11,
+  color: '#4F0CBD',
+  fontWeight: '500',
+  textTransform: 'capitalize',
+  textAlign: 'center',
+},
 });
