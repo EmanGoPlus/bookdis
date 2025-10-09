@@ -292,7 +292,6 @@ const promoController = {
 
       let businessId = null;
 
-      // 🧠 Only fetch businessId for merchant/employee
       if (user.role === "merchant" || user.role === "employee") {
         businessId = await promoModel.getBusinessId(user);
 
@@ -304,7 +303,6 @@ const promoController = {
         }
       }
 
-      // ✅ Customers will pass businessId = null
       const promoDetails = await promoModel.getPromoDetailsByQRCode(
         qrCode,
         businessId
@@ -358,7 +356,7 @@ const promoController = {
         data: responseData,
       });
     } catch (error) {
-      console.error("❌ Error getting promo details:", error);
+      console.error("Error getting promo details:", error);
       return reply.status(500).send({
         success: false,
         message: `Failed to get promo details: ${
@@ -419,48 +417,64 @@ const promoController = {
   },
 
   async redeemPromo(request, reply) {
-  try {
-    const { qrCode } = request.body;
-    const employeeOrMerchant = request.user;
+    try {
+      const { qrCode } = request.body;
+      const employeeOrMerchant = request.user;
 
-    if (!qrCode) {
-      return reply.status(400).send({ success: false, message: "QR code is required" });
+      if (!qrCode) {
+        return reply
+          .status(400)
+          .send({ success: false, message: "QR code is required" });
+      }
+
+      const result = await promoModel.redeemPromoByQr(qrCode);
+
+      const socketData = {
+        claimId: result.claimId,
+        promoId: result.promoId,
+        customerId: result.customerId,
+        redeemedAt: result.redeemedAt,
+        promoTitle: result.promoTitle,
+        source: result.source,
+      };
+
+      const customerRoom = `customer-${result.customerId}`;
+      request.server.io.to(customerRoom).emit("promoRedeemed", socketData);
+      request.server.io.emit("promoUpdate", { promoId: result.promoId });
+
+      return reply.status(200).send({
+        success: true,
+        message: `Promo redeemed successfully (${result.source})`,
+        data: result,
+      });
+    } catch (error) {
+      if (error.message.includes("invalid")) {
+        return reply
+          .status(404)
+          .send({ success: false, message: "Invalid QR code" });
+      }
+      if (error.message.includes("already been redeemed")) {
+        return reply
+          .status(400)
+          .send({
+            success: false,
+            message: "This promo has already been redeemed",
+          });
+      }
+      if (error.message.includes("expired")) {
+        return reply
+          .status(400)
+          .send({ success: false, message: "QR code has expired" });
+      }
+      return reply
+        .status(500)
+        .send({
+          success: false,
+          message: "Failed to redeem promo",
+          error: error.message,
+        });
     }
-
-    const result = await promoModel.redeemPromoByQr(qrCode);
-
-    const socketData = {
-      claimId: result.claimId,
-      promoId: result.promoId,
-      customerId: result.customerId,
-      redeemedAt: result.redeemedAt,
-      promoTitle: result.promoTitle,
-      source: result.source,
-    };
-
-    const customerRoom = `customer-${result.customerId}`;
-    request.server.io.to(customerRoom).emit("promoRedeemed", socketData);
-    request.server.io.emit("promoUpdate", { promoId: result.promoId });
-
-    return reply.status(200).send({
-      success: true,
-      message: `Promo redeemed successfully (${result.source})`,
-      data: result,
-    });
-  } catch (error) {
-    if (error.message.includes("invalid")) {
-      return reply.status(404).send({ success: false, message: "Invalid QR code" });
-    }
-    if (error.message.includes("already been redeemed")) {
-      return reply.status(400).send({ success: false, message: "This promo has already been redeemed" });
-    }
-    if (error.message.includes("expired")) {
-      return reply.status(400).send({ success: false, message: "QR code has expired" });
-    }
-    return reply.status(500).send({ success: false, message: "Failed to redeem promo", error: error.message });
-  }
-},
-
+  },
 
   async claimedPromosInventory(request, reply) {
     try {

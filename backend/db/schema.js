@@ -221,6 +221,7 @@ export const promos = pgTable("tbl_promos", {
 
   maxClaims: integer("max_claims"),
   maxClaimsPerUser: integer("max_claims_per_user"),
+  remainingClaims: integer("remaining_claim"),
 
   eligibleMemberships: varchar("eligible_memberships", { length: 255 }),
 
@@ -272,6 +273,9 @@ export const sharedPromos = pgTable("tbl_shared_promos", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ----------------------
+// Friends
+// ----------------------
 
 export const friends = pgTable("tbl_friends", {
   id: serial("id").primaryKey(),
