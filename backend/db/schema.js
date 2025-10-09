@@ -18,6 +18,7 @@ export const merchants = pgTable("tbl_merchants", {
 // ----------------------
 // Employees (assigned to ONE business)
 // ----------------------
+
 export const employees = pgTable("tbl_employees", {
   id: serial("id").primaryKey(),
   firstName: varchar("first_name", { length: 50 }),

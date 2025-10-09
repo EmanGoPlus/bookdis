@@ -29,13 +29,13 @@ export default function QrScannerScreen({ navigation }) {
   const [scaleAnim] = useState(new Animated.Value(0));
   const [swipeX] = useState(new Animated.Value(0));
   
-  const { user, userRole, isMerchant, isEmployee } = useContext(UserContext);
+const { user, business, userRole, isMerchant, isEmployee } = useContext(UserContext);
   const socketRef = useRef(null);
   const scanningRef = useRef(false);
   const lastScannedCode = useRef(null);
   const lastScanTime = useRef(0);
   const currentQrCode = useRef(null);
-  const tokenRef = useRef(null); // ✅ ADD THIS LINE
+  const tokenRef = useRef(null);
 
   useEffect(() => {
     if (!userToken || socketRef.current) return;
@@ -67,9 +67,9 @@ export default function QrScannerScreen({ navigation }) {
   useEffect(() => {
     const getToken = async () => {
       const token = await AsyncStorage.getItem("token");
-      console.log("🔑 Token retrieved:", token ? "EXISTS" : "NULL");
+      console.log(" Token retrieved:", token ? "EXISTS" : "NULL");
       setUserToken(token);
-      tokenRef.current = token; // ✅ ADD THIS LINE
+      tokenRef.current = token;
     };
     getToken();
   }, []);
@@ -110,18 +110,18 @@ export default function QrScannerScreen({ navigation }) {
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dx > SWIPE_THRESHOLD) {
-          console.log("✅ Swipe threshold reached!");
+          console.log("Swipe threshold reached!");
           Animated.timing(swipeX, {
             toValue: 400,
             duration: 300,
             useNativeDriver: true,
           }).start(() => {
-            console.log("🎬 Animation completed, calling handleRedeemPromo");
-            console.log("📋 currentQrCode.current:", currentQrCode.current);
+            console.log("Animation completed, calling handleRedeemPromo");
+            console.log("currentQrCode.current:", currentQrCode.current);
             if (currentQrCode.current) {
               handleRedeemPromo(currentQrCode.current);
             } else {
-              console.warn("⚠️ Cannot redeem — no QR code stored");
+              console.warn("Cannot redeem — no QR code stored");
             }
           });
         } else {
@@ -135,167 +135,208 @@ export default function QrScannerScreen({ navigation }) {
     })
   ).current;
 
-  const handleBarCodeScanned = async ({ type, data }) => {
-    const now = Date.now();
+const handleBarCodeScanned = async ({ type, data }) => {
+  const now = Date.now();
+  
+  if (scanningRef.current) {
+    console.log("Already scanning, ignoring");
+    return;
+  }
+
+  if (lastScannedCode.current === data && (now - lastScanTime.current) < 5000) {
+    console.log("Same QR code scanned too quickly");
+    return;
+  }
+
+  // ✅ CHECK: Ensure merchant has selected a business
+  if (isMerchant() && !business?.id) {
+    console.error("❌ Merchant has no business selected!");
+    setRedemptionResult({
+      success: false,
+      error: "Please select a business first before scanning QR codes",
+    });
+    return;
+  }
+
+  scanningRef.current = true;
+  lastScannedCode.current = data;
+  lastScanTime.current = now;
+  currentQrCode.current = data;
+  
+  console.log("QR Code scanned:", data);
+  console.log("Stored in currentQrCode.current:", currentQrCode.current);
+  console.log("📍 Current business:", business); // ✅ Debug log
+  
+  setScanned(true);
+  setLoading(true);
+  
+  try {
+    const url = `${API_BASE_URL}/api/user/business/get-promo-details`;
+    console.log("Fetching promo details from:", url);
+    console.log("Using token:", tokenRef.current ? "EXISTS" : "NULL");
     
-    if (scanningRef.current) {
-      console.log("⏭️ Already scanning, ignoring");
-      return;
+    // ✅ BUILD REQUEST BODY: Include businessId for merchants
+    const requestBody = { qrCode: data };
+    if (isMerchant() && business?.id) {
+      requestBody.businessId = business.id;
+      console.log("📦 Including businessId for merchant:", business.id);
     }
-
-    if (lastScannedCode.current === data && (now - lastScanTime.current) < 5000) {
-      console.log("⏭️ Same QR code scanned too quickly");
-      return;
-    }
-
-    scanningRef.current = true;
-    lastScannedCode.current = data;
-    lastScanTime.current = now;
-    currentQrCode.current = data;
     
-    console.log("📷 QR Code scanned:", data);
-    console.log("💾 Stored in currentQrCode.current:", currentQrCode.current);
+    console.log("📦 Request body:", requestBody); // ✅ Debug log
     
-    setScanned(true);
-    setLoading(true);
-    
-    try {
-      const url = `${API_BASE_URL}/api/user/business/get-promo-details`;
-      console.log("📡 Fetching promo details from:", url);
-      console.log("🔑 Using token:", tokenRef.current ? "EXISTS" : "NULL"); // ✅ CHANGE THIS LINE
-      
-      const response = await axios.post(
-        url,
-        { qrCode: data },
-        { headers: { Authorization: `Bearer ${tokenRef.current}` } } // ✅ CHANGE THIS LINE
-      );
+    const response = await axios.post(
+      url,
+      requestBody, // ✅ Use the new request body
+      { headers: { Authorization: `Bearer ${tokenRef.current}` } }
+    );
 
-      console.log("✅ Get promo details response:", response.data);
+    console.log("✅ Get promo details response:", response.data);
 
-      if (response.data.success) {
-        setPromoPreview({
-          qrCode: data,
-          promoTitle: response.data.data.promoTitle,
-          description: response.data.data.description,
-          customerName: response.data.data.customerName,
-          customerCode: response.data.data.customerCode,
-          merchantName: response.data.data.merchantName,
-          validUntil: response.data.data.validUntil,
-          promoType: response.data.data.promoType,
-          imageUrl: response.data.data.imageUrl,
-          claimId: response.data.data.claimId,
-          claimType: response.data.data.claimType,
-          isSharedPromo: response.data.data.isSharedPromo,
-          sharedFrom: response.data.data.sharedFrom,
-        });
-      } else {
-        console.log("⚠️ Get promo details failed:", response.data.message);
-        setRedemptionResult({
-          success: false,
-          error: response.data.message || "Failed to fetch promo details",
-        });
-      }
-    } catch (error) {
-      console.error("❌ Error fetching promo details:", error);
-      console.error("📄 Error response:", error.response?.data);
-      console.error("📊 Error status:", error.response?.status);
+    if (response.data.success) {
+      setPromoPreview({
+        qrCode: data,
+        promoTitle: response.data.data.promoTitle,
+        description: response.data.data.description,
+        customerName: response.data.data.customerName,
+        customerCode: response.data.data.customerCode,
+        merchantName: response.data.data.merchantName,
+        validUntil: response.data.data.validUntil,
+        promoType: response.data.data.promoType,
+        imageUrl: response.data.data.imageUrl,
+        claimId: response.data.data.claimId,
+        claimType: response.data.data.claimType,
+        isSharedPromo: response.data.data.isSharedPromo,
+        sharedFrom: response.data.data.sharedFrom,
+      });
+    } else {
+      console.log("⚠️ Get promo details failed:", response.data.message);
       setRedemptionResult({
         success: false,
-        error: error.response?.data?.message || "Failed to fetch promo details",
+        error: response.data.message || "Failed to fetch promo details",
       });
-    } finally {
-      setLoading(false);
-      setTimeout(() => {
-        scanningRef.current = false;
-      }, 3000);
     }
-  };
+  } catch (error) {
+    console.error("❌ Error fetching promo details:", error);
+    console.error("📄 Error response:", error.response?.data);
+    console.error("📊 Error status:", error.response?.status);
+    setRedemptionResult({
+      success: false,
+      error: error.response?.data?.message || "Failed to fetch promo details",
+    });
+  } finally {
+    setLoading(false);
+    setTimeout(() => {
+      scanningRef.current = false;
+    }, 3000);
+  }
+};
 
-  const handleRedeemPromo = async (qrCode) => {
-    console.log("🎯 handleRedeemPromo called with QR code:", qrCode);
-    console.log("🔑 Token from state:", userToken ? "YES" : "NO");
-    console.log("🔑 Token from ref:", tokenRef.current ? "YES" : "NO"); // ✅ ADD THIS LINE
+const handleRedeemPromo = async (qrCode) => {
+  console.log("🎯 handleRedeemPromo called with QR code:", qrCode);
+  console.log("🔑 Token from state:", userToken ? "YES" : "NO");
+  console.log("🔑 Token from ref:", tokenRef.current ? "YES" : "NO");
+  console.log("📍 Current business:", business); // ✅ Debug log
+  
+  const token = tokenRef.current;
+  
+  if (!token) {
+    console.error("❌ No token available!");
+    setRedemptionResult({
+      success: false,
+      error: "Authentication token not found. Please try again.",
+    });
+    setLoading(false);
+    swipeX.setValue(0);
+    return;
+  }
+
+  // ✅ CHECK: Ensure merchant has selected a business
+  if (isMerchant() && !business?.id) {
+    console.error("❌ Merchant has no business selected!");
+    setRedemptionResult({
+      success: false,
+      error: "Please select a business first before redeeming",
+    });
+    setLoading(false);
+    swipeX.setValue(0);
+    return;
+  }
+  
+  setLoading(true);
+  setPromoPreview(null);
+  
+  try {
+    const url = `${API_BASE_URL}/api/user/business/redeem-promo`;
     
-    const token = tokenRef.current; // ✅ ADD THIS LINE
+    // ✅ BUILD REQUEST BODY: Include businessId for merchants
+    const requestBody = { qrCode };
+    if (isMerchant() && business?.id) {
+      requestBody.businessId = business.id;
+      console.log("📦 Including businessId for merchant:", business.id);
+    }
     
-    if (!token) {
-      console.error("❌ No token available!");
+    console.log("📡 Sending redemption request to:", url);
+    console.log("📦 Request body:", requestBody); // ✅ Updated log
+    console.log("🔐 Authorization header:", token ? `Bearer ${token.substring(0, 20)}...` : "NULL");
+    
+    const response = await axios.post(
+      url,
+      requestBody, // ✅ Use the new request body
+      { 
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        } 
+      }
+    );
+
+    console.log("Redemption response:", response.data);
+    console.log("Response status:", response.status);
+
+    if (response.data.success) {
+      console.log("🎉 Redemption successful!");
+      setRedemptionResult({
+        success: true,
+        message: response.data.message,
+        promoTitle: response.data.data.promoTitle,
+        customerName: response.data.data.customerName,
+        redeemedAt: response.data.data.redeemedAt,
+        claimId: response.data.data.claimId,
+      });
+    } else {
+      console.log("Redemption failed (success=false):", response.data.message);
       setRedemptionResult({
         success: false,
-        error: "Authentication token not found. Please try again.",
+        error: response.data.message || "Failed to redeem promo",
       });
-      setLoading(false);
-      swipeX.setValue(0);
-      return;
     }
+  } catch (error) {
+    console.error("Redemption error:", error);
+    console.error("Error response:", error.response?.data);
+    console.error("Error status:", error.response?.status);
+    console.error("Error message:", error.message);
     
-    setLoading(true);
-    setPromoPreview(null);
-    
-    try {
-      const url = `${API_BASE_URL}/api/user/business/redeem-promo`;
-      console.log("📡 Sending redemption request to:", url);
-      console.log("📦 Request body:", { qrCode });
-      console.log("🔐 Authorization header:", token ? `Bearer ${token.substring(0, 20)}...` : "NULL");
-      
-      const response = await axios.post(
-        url,
-        { qrCode },
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`, // ✅ CHANGE THIS LINE
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
-
-      console.log("✅ Redemption response:", response.data);
-      console.log("📊 Response status:", response.status);
-
-      if (response.data.success) {
-        console.log("🎉 Redemption successful!");
-        setRedemptionResult({
-          success: true,
-          message: response.data.message,
-          promoTitle: response.data.data.promoTitle,
-          customerName: response.data.data.customerName,
-          redeemedAt: response.data.data.redeemedAt,
-          claimId: response.data.data.claimId,
-        });
-      } else {
-        console.log("⚠️ Redemption failed (success=false):", response.data.message);
-        setRedemptionResult({
-          success: false,
-          error: response.data.message || "Failed to redeem promo",
-        });
-      }
-    } catch (error) {
-      console.error("❌ Redemption error:", error);
-      console.error("📄 Error response:", error.response?.data);
-      console.error("📊 Error status:", error.response?.status);
-      console.error("🔍 Error message:", error.message);
-      
-      if (error.response?.data?.message?.includes("already been redeemed")) {
-        console.log("ℹ️ Ignoring duplicate scan error - first scan succeeded");
-        setRedemptionResult({
-          success: true,
-          message: "Promo redeemed successfully",
-          promoTitle: "Promo",
-          customerName: "Customer",
-          redeemedAt: new Date().toISOString(),
-          claimId: null,
-        });
-      } else {
-        setRedemptionResult({
-          success: false,
-          error: error.response?.data?.message || error.message || "Failed to redeem promo",
-        });
-      }
-    } finally {
-      setLoading(false);
-      swipeX.setValue(0);
+    if (error.response?.data?.message?.includes("already been redeemed")) {
+      console.log("Ignoring duplicate scan error - first scan succeeded");
+      setRedemptionResult({
+        success: true,
+        message: "Promo redeemed successfully",
+        promoTitle: "Promo",
+        customerName: "Customer",
+        redeemedAt: new Date().toISOString(),
+        claimId: null,
+      });
+    } else {
+      setRedemptionResult({
+        success: false,
+        error: error.response?.data?.message || error.message || "Failed to redeem promo",
+      });
     }
-  };
+  } finally {
+    setLoading(false);
+    swipeX.setValue(0);
+  }
+};
 
   const resetScanner = () => {
     console.log("🔄 Resetting scanner");
