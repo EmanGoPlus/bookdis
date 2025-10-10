@@ -209,6 +209,103 @@ const businessController = {
       return reply.status(500).send({ error: "Internal server error" });
     }
   },
+
+    async getBusinessProfile(request, reply) {
+    try {
+      const { businessId } = request.params;
+      const { customerId } = request.query; // Optional: to check membership
+
+      if (!businessId) {
+        return reply.status(400).send({
+          success: false,
+          message: "businessId is required",
+        });
+      }
+
+      const profileData = await businessModel.getBusinessProfile(
+        parseInt(businessId),
+        customerId ? parseInt(customerId) : null
+      );
+
+      if (!profileData || !profileData.business) {
+        return reply.status(404).send({
+          success: false,
+          message: "Business not found",
+        });
+      }
+
+      return reply.status(200).send({
+        success: true,
+        data: profileData,
+      });
+    } catch (err) {
+      console.error("Get business profile error:", err);
+      return reply.status(500).send({
+        success: false,
+        message: err.message,
+      });
+    }
+  },
+
+  // Get only business promos
+  async getBusinessPromos(request, reply) {
+    try {
+      const { businessId } = request.params;
+
+      if (!businessId) {
+        return reply.status(400).send({
+          success: false,
+          message: "businessId is required",
+        });
+      }
+
+      const promos = await businessModel.getBusinessPromos(parseInt(businessId));
+
+      return reply.status(200).send({
+        success: true,
+        data: promos,
+      });
+    } catch (err) {
+      console.error("Get business promos error:", err);
+      return reply.status(500).send({
+        success: false,
+        message: err.message,
+      });
+    }
+  },
+
+  // Check membership status
+  async checkMembership(request, reply) {
+    try {
+      const { businessId, customerId } = request.params;
+
+      if (!businessId || !customerId) {
+        return reply.status(400).send({
+          success: false,
+          message: "businessId and customerId are required",
+        });
+      }
+
+      const membership = await businessModel.checkMembership(
+        parseInt(customerId),
+        parseInt(businessId)
+      );
+
+      return reply.status(200).send({
+        success: true,
+        data: {
+          isMember: !!membership,
+          membership: membership || null,
+        },
+      });
+    } catch (err) {
+      console.error("Check membership error:", err);
+      return reply.status(500).send({
+        success: false,
+        message: err.message,
+      });
+    }
+  },
 };
 
 export default businessController;

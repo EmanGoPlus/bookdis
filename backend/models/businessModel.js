@@ -1,7 +1,6 @@
 import db from "../db/config.js";
-import { businesses } from "../db/schema.js";
-import { businessDocuments } from "../db/schema.js";
-import { eq, and } from "drizzle-orm";
+import { businesses, promos, customerMemberships, businessDocuments} from "../db/schema.js";
+import { eq, and, gte, lte } from "drizzle-orm";
 
 async function generateBusinessCode() {
   let code;
@@ -221,6 +220,112 @@ const businessModel = {
       console.error("Database error in setStatus:", error);
       throw error;
     }
+  },
+
+  //for business profile sa customer page
+  async getBusinessByIdV2(businessId) {
+    const result = await db
+      .select({
+        id: businesses.id,
+        businessCode: businesses.businessCode,
+        businessName: businesses.businessName,
+        mainCategory: businesses.mainCategory,
+        subCategory: businesses.subCategory,
+        logo: businesses.logo,
+        region: businesses.region,
+        province: businesses.province,
+        city: businesses.city,
+        barangay: businesses.barangay,
+        postalCode: businesses.postalCode,
+        addressDetails: businesses.addressDetails,
+        openTime: businesses.openTime,
+        closeTime: businesses.closeTime,
+        verificationStatus: businesses.verificationStatus,
+        createdAt: businesses.createdAt,
+      })
+      .from(businesses)
+      .where(eq(businesses.id, businessId))
+      .limit(1);
+    
+    return result[0];
+  },
+
+  // Get active promos for a specific business
+  async getBusinessPromos(businessId) {
+    const now = new Date();
+    
+    return await db
+      .select({
+        promoId: promos.id,
+        businessId: promos.businessId,
+        title: promos.title,
+        description: promos.description,
+        promoType: promos.promoType,
+        imageUrl: promos.imageUrl,
+        startDate: promos.startDate,
+        endDate: promos.endDate,
+        maxClaims: promos.maxClaims,
+        maxClaimsPerUser: promos.maxClaimsPerUser,
+        remainingClaims: promos.remainingClaims,
+        eligibleMemberships: promos.eligibleMemberships,
+        isActive: promos.isActive,
+        createdAt: promos.createdAt,
+      })
+      .from(promos)
+      .where(
+        and(
+          eq(promos.businessId, businessId),
+          eq(promos.isActive, true),
+          lte(promos.startDate, now),
+          gte(promos.endDate, now)
+        )
+      )
+      .orderBy(promos.createdAt);
+  },
+
+  // Check if customer is a member of this business
+  async checkMembership(customerId, businessId) {
+    const result = await db
+      .select({
+        membershipId: customerMemberships.id,
+        membershipLevel: customerMemberships.membershipLevel,
+        isActive: customerMemberships.isActive,
+        createdAt: customerMemberships.createdAt,
+      })
+      .from(customerMemberships)
+      .where(
+        and(
+          eq(customerMemberships.customerId, customerId),
+          eq(customerMemberships.businessId, businessId),
+          eq(customerMemberships.isActive, true)
+        )
+      )
+      .limit(1);
+    
+    return result[0];
+  },
+
+  // Get business profile with promos and membership status
+  async getBusinessProfile(businessId, customerId = null) {
+    const business = await this.getBusinessById(businessId);
+    
+    if (!business) {
+      return null;
+    }
+
+    const promosData = await this.getBusinessPromos(businessId);
+    
+    let membership = null;
+    if (customerId) {
+      membership = await this.checkMembership(customerId, businessId);
+    }
+
+    return {
+      business,
+      promos: promosData,
+      membership,
+      isMember: !!membership,
+    };
   },
 };
 

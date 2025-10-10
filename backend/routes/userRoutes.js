@@ -57,9 +57,27 @@ async function userRoutes(fastify, options) {
 
   fastify.get(
     "/business/:businessId",
-    { preHandler: authenticateToken },
-    businessController.getBusinessById
-  );
+    { preHandler: authenticateToken, 
+      handler:  businessController.getBusinessById
+    });
+
+fastify.get(
+  "/business/profile/:businessId",
+  { preHandler: authenticateToken, 
+    handler: businessController.getBusinessProfile
+  });
+
+fastify.get(
+  "/business/:businessId/promos",
+  { preHandler: authenticateToken,
+    handler: businessController.getBusinessPromos
+   });
+
+fastify.get(
+  "/business/:businessId/membership/:customerId",
+  { preHandler: authenticateToken,
+    handler: businessController.checkMembership
+  });
 
   //=============================Permissions=============================
 
